@@ -1,5 +1,4 @@
-# Progetto Squillace – Pipeline ETL 
-### Prova pratica di tirocinio – Halley Sud
+# Progetto Squillace – Pipeline ETL
 
 Questo documento racconta l'intero percorso che ha portato alla realizzazione della
 pipeline ETL per il Comune di Squillace: dall'analisi dei portali fino al caricamento
@@ -15,47 +14,72 @@ fatte per superarle.
 | **Antigravity** (con Claude Sonnet e Gemini 3.5 Flash High) | Ha generato la struttura iniziale del codice e i primi script funzionanti. È stato il punto di partenza per tutte e tre le fasi. |
 | **DeepSeek** | Ha accompagnato l'intero sviluppo come supporto critico: ha verificato il codice, suggerito correzioni, aiutato a interpretare i log e monitorato la coerenza dei dati. Ha svolto il ruolo di "revisore" del lavoro di Antigravity. |
 
+### Errori e correzioni
+
+Durante lo sviluppo, gli agenti hanno commesso alcune piccole imprecisioni
+che sono state individuate e corrette strada facendo:
+
+- **Atti annullati**: in fase di scraping, il tentativo di escludere subito
+  gli atti annullati non ha funzionato perché lo stile barrato era applicato
+  alle celle e non alla riga intera. Si è quindi deciso di rimandare la
+  pulizia alla normalizzazione, dove è più semplice filtrare i record senza
+  link al dettaglio.
+- **Timeout HTTP**: il timeout predefinito non bastava per scaricare la
+  pagina più grande ed è stato portato a 120 secondi.
+- **Parsing del tipo atto**: per la seconda fonte è stato necessario
+  correggere l'espressione regolare per estrarre solo il testo dopo
+  `"Tipo\n"`.
+
+In tutti i casi, la verifica manuale dei log e dei CSV ha permesso di
+confermare la bontà delle correzioni prima di procedere.
+
 ---
 
 ## Struttura del progetto
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
 
-PROGETTO_SQUILLACE/
-├── README.md ← questo file
-├── requirements.txt ← dipendenze Python
-├── intermediMC.sql ← schema MySQL fornito dall'azienda
-├── config/
-│ └── sources.yaml ← URL, selettori e parametri di estrazione
-|
-├── scrapers/ ← Fase 1 – Estrazione
-│ ├── base_scraper.py ← classe base riutilizzabile
-│ ├── fonte1_scraper.py ← scraper per ASMENET
-│ └── fonte2_scraper.py ← scraper per Halley (con Selenium)
-|
-├── extract/ ← script eseguibili di estrazione
-│ ├── estrai_fonte1.py
-│ └── estrai_fonte2.py
-├── transform/ ← Fase 2 – Normalizzazione
-│ └── normalizza.py
-|
-├── load/ ← Fase 3 – Caricamento MySQL
-│ └── carica_mysql.py
-| |__ check_db.py
-| |__ check_schema.py
-|
-├── data/ ← CSV generati (grezzi e tracciato di mezzo)
-└── allegati/ ← PDF scaricati
-├── fonte1/
-└── fonte2/
+### Cartella principale
+- `README.md`
+- `requirements.txt`
+- `intermediMC.sql`
+
+### config/
+- `sources.yaml`
+
+### scrapers/
+- `base_scraper.py`
+- `fonte1_scraper.py`
+- `fonte2_scraper.py`
+
+### extract/
+- `estrai_fonte1.py`
+- `estrai_fonte2.py`
+
+### transform/
+- `normalizza.py`
+
+### load/
+- `carica_mysql.py`
+- `check_db.py`
+- `check_schema.py`
+
+### data/
+- `fonte1_raw.csv`
+- `fonte2_raw.csv`
+- `tracciato_mezzo.csv`
+
+### allegati/
+- `fonte1/` (PDF primo portale)
+- `fonte2/` (PDF secondo portale)
 
 ---
 
 ## Fase 1 – Estrazione
 
 ### Obiettivo
-Recuperare tutti gli atti pubblicati dal portale ASMENET e solo le delibere
-dal 12/04/2024 dal portale Halley, compresi gli allegati.
+Recuperare tutti gli atti pubblicati dal primo portale e solo le delibere
+dal 12/04/2024 dal secondo portale, compresi gli allegati.
 
 ### Analisi preliminare dei portali
 Prima di scrivere qualsiasi codice, abbiamo aperto i due siti nel browser e
@@ -68,15 +92,14 @@ individuato:
 - Se la pagina è statica o carica i dati dinamicamente
 - Il meccanismo di paginazione (dove presente)
 
-### Fonte 1 – ASMENET (tutti i dati)
-Il portale ASMENET presenta un archivio storico di 3726 record in una **singola
+### Fonte 1 – Portale statico (tutti i dati)
+Il primo portale presenta un archivio storico di 3726 record in una **singola
 pagina HTML**, senza paginazione. La tabella è molto grande ma completamente
 statica, quindi è stato possibile usare `requests` e `BeautifulSoup` per
 scaricare la pagina e fare il parsing.
 
 **Scelte tecniche:**
-- La pagina è molto pesante: abbiamo aumentato il timeout HTTP a 120 secondi
-  per evitare errori di timeout durante il download.
+- La pagina è molto pesante, quindi abbiamo aumentato il timeout HTTP a 120 secondi.
 - Gli allegati si trovano su una seconda pagina di dettaglio (raggiungibile
   tramite un link nella tabella principale). Per ogni atto lo scraper visita
   il dettaglio e scarica i PDF.
@@ -84,17 +107,12 @@ scaricare la pagina e fare il parsing.
   numero di registrazione, in modo che sia sempre possibile risalire dal
   record al file.
 
-**Problema riscontrato – atti annullati:**
-La tabella contiene anche atti annullati (righe con stile barrato e una riga
-successiva di spiegazione). Inizialmente avevamo previsto di escluderli già
-in fase di scraping controllando lo stile `text-decoration: line-through`,
-ma questo stile è applicato alle singole celle e non alla riga intera, quindi
-il controllo non ha funzionato. Abbiamo deciso di estrarre tutto (compresi gli
-annullati) e di rimuoverli nella fase di normalizzazione, dove è più facile
-filtrare i record senza link al dettaglio.
+**Atti annullati:**
+Come anticipato, gli atti annullati sono stati estratti insieme agli altri
+e rimossi nella fase di normalizzazione.
 
-### Fonte 2 – Halley (solo delibere dal 12/04/2024)
-Il portale Halley ha una tabella che viene **caricata dinamicamente via
+### Fonte 2 – Portale dinamico (solo delibere dal 12/04/2024)
+Il secondo portale ha una tabella che viene **caricata dinamicamente via
 JavaScript** dopo il caricamento della pagina. Con `requests` si otteneva solo
 lo scheletro vuoto della pagina, senza dati.
 
@@ -122,7 +140,7 @@ Creare un tracciato di mezzo unico che unifichi i dati delle due fonti,
 applicando tutte le pulizie necessarie.
 
 ### Perché un tracciato di mezzo
-L'azienda ha chiesto esplicitamente uno strato intermedio che disaccoppi
+È stato richiesto esplicitamente uno strato intermedio che disaccoppi
 l'estrazione dal caricamento. Il tracciato di mezzo è un CSV con una
 struttura fissa e indipendente dalle fonti: se in futuro si aggiungerà un
 nuovo portale, basterà aggiornare lo scraper e la normalizzazione, senza
@@ -137,10 +155,8 @@ proprio gli atti annullati) e quelli con `numero_reg` che inizia per
 262 righe.
 
 **Fonte 2 – Estrazione del tipo atto:**
-Il campo `tipo` nel CSV grezzo della Fonte 2 conteneva un blocco di testo
-con numero pubblicazione, mittente e tipo (es. "579\nMittente\n...\nTipo\n
-Delibere di Giunta"). Abbiamo estratto solo la parte dopo "Tipo\n" con
-un'espressione regolare.
+Come accennato, il parsing è stato corretto per estrarre solo la parte
+dopo `"Tipo\n"`.
 
 **Date e codifica:**
 Tutte le date sono state convertite in formato `YYYY-MM-DD`. L'encoding
@@ -168,16 +184,17 @@ risolto un problema tecnico con i file di log di InnoDB che impedivano l'avvio
 di MySQL, il server è partito correttamente sulla porta **3306**.
 
 Tramite **HeidiSQL** ci siamo connessi al server (`localhost:3306`, utente
-`root`, senza password) e abbiamo importato il file `intermediMC.sql` (fornito
-dall'azienda) per creare il database e le tabelle necessarie. Le tabelle sono
-state create vuote e pronte per essere popolate.
+`root`, senza password) e abbiamo importato il file `intermediMC.sql` per
+creare il database e le tabelle necessarie. Le tabelle sono state create
+vuote e pronte per essere popolate.
 
 ### Nota sulle credenziali
 In questo progetto non è stato usato un file `.env` per
-proteggere le credenziali del database perché, trattandosi di una prova pratica con
-un server MySQL locale e credenziali di default (`root` senza password), non c'erano
-dati sensibili da proteggere. In un ambiente di produzione, le credenziali andrebbero
-inserite in un file `.env` separato ed escluso dal versionamento tramite `.gitignore`.
+proteggere le credenziali del database perché, trattandosi di un ambiente
+di sviluppo locale con credenziali di default (`root` senza password), non
+c'erano dati sensibili da proteggere. In un ambiente di produzione, le
+credenziali andrebbero inserite in un file `.env` separato ed escluso dal
+versionamento tramite `.gitignore`.
 
 ### Script di caricamento
 Lo script `load/carica_mysql.py`:
@@ -251,4 +268,4 @@ python transform/normalizza.py
 # Caricamento su MySQL
 python load/carica_mysql.py
 
-*Progetto realizzato da Mattia come prova pratica di tirocinio per Halley Sud, 29 maggio 2026.*
+*Progetto realizzato da Mattia il 29 maggio 2026.*
