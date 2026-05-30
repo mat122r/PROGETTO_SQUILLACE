@@ -1,0 +1,254 @@
+# Progetto Squillace – Pipeline ETL 
+### Prova pratica di tirocinio – Halley Sud
+
+Questo documento racconta l'intero percorso che ha portato alla realizzazione della
+pipeline ETL per il Comune di Squillace: dall'analisi dei portali fino al caricamento
+dei dati nel database MySQL, passando per tutte le difficoltà incontrate e le scelte
+fatte per superarle.
+
+---
+
+## Agenti AI utilizzati
+
+| Agente / Modello | Ruolo nel progetto |
+|------------------|-------------------|
+| **Antigravity** (con Claude Sonnet e Gemini 3.5 Flash High) | Ha generato la struttura iniziale del codice e i primi script funzionanti. È stato il punto di partenza per tutte e tre le fasi. |
+| **DeepSeek** | Ha accompagnato l'intero sviluppo come supporto critico: ha verificato il codice, suggerito correzioni, aiutato a interpretare i log e monitorato la coerenza dei dati. Ha svolto il ruolo di "revisore" del lavoro di Antigravity. |
+
+---
+
+## Struttura del progetto
+
+Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
+
+PROGETTO_SQUILLACE/
+├── README.md ← questo file
+├── requirements.txt ← dipendenze Python
+├── intermediMC.sql ← schema MySQL fornito dall'azienda
+├── config/
+│ └── sources.yaml ← URL, selettori e parametri di estrazione
+|
+├── scrapers/ ← Fase 1 – Estrazione
+│ ├── base_scraper.py ← classe base riutilizzabile
+│ ├── fonte1_scraper.py ← scraper per ASMENET
+│ └── fonte2_scraper.py ← scraper per Halley (con Selenium)
+|
+├── extract/ ← script eseguibili di estrazione
+│ ├── estrai_fonte1.py
+│ └── estrai_fonte2.py
+├── transform/ ← Fase 2 – Normalizzazione
+│ └── normalizza.py
+|
+├── load/ ← Fase 3 – Caricamento MySQL
+│ └── carica_mysql.py
+| |__ check_db.py
+| |__ check_schema.py
+|
+├── data/ ← CSV generati (grezzi e tracciato di mezzo)
+└── allegati/ ← PDF scaricati
+├── fonte1/
+└── fonte2/
+
+---
+
+## Fase 1 – Estrazione
+
+### Obiettivo
+Recuperare tutti gli atti pubblicati dal portale ASMENET e solo le delibere
+dal 12/04/2024 dal portale Halley, compresi gli allegati.
+
+### Analisi preliminare dei portali
+Prima di scrivere qualsiasi codice, abbiamo aperto i due siti nel browser e
+studiato l'HTML con gli strumenti di sviluppo (F12). Per ogni fonte abbiamo
+individuato:
+
+- La struttura della tabella o del contenitore dei dati
+- I selettori CSS per estrarre numero, data, oggetto, tipo e link al dettaglio
+- Come vengono gestiti gli allegati (link diretti, script di download, ecc.)
+- Se la pagina è statica o carica i dati dinamicamente
+- Il meccanismo di paginazione (dove presente)
+
+### Fonte 1 – ASMENET (tutti i dati)
+Il portale ASMENET presenta un archivio storico di 3726 record in una **singola
+pagina HTML**, senza paginazione. La tabella è molto grande ma completamente
+statica, quindi è stato possibile usare `requests` e `BeautifulSoup` per
+scaricare la pagina e fare il parsing.
+
+**Scelte tecniche:**
+- La pagina è molto pesante: abbiamo aumentato il timeout HTTP a 120 secondi
+  per evitare errori di timeout durante il download.
+- Gli allegati si trovano su una seconda pagina di dettaglio (raggiungibile
+  tramite un link nella tabella principale). Per ogni atto lo scraper visita
+  il dettaglio e scarica i PDF.
+- Gli allegati vengono salvati in `allegati/fonte1/<N.Reg>/`, organizzati per
+  numero di registrazione, in modo che sia sempre possibile risalire dal
+  record al file.
+
+**Problema riscontrato – atti annullati:**
+La tabella contiene anche atti annullati (righe con stile barrato e una riga
+successiva di spiegazione). Inizialmente avevamo previsto di escluderli già
+in fase di scraping controllando lo stile `text-decoration: line-through`,
+ma questo stile è applicato alle singole celle e non alla riga intera, quindi
+il controllo non ha funzionato. Abbiamo deciso di estrarre tutto (compresi gli
+annullati) e di rimuoverli nella fase di normalizzazione, dove è più facile
+filtrare i record senza link al dettaglio.
+
+### Fonte 2 – Halley (solo delibere dal 12/04/2024)
+Il portale Halley ha una tabella che viene **caricata dinamicamente via
+JavaScript** dopo il caricamento della pagina. Con `requests` si otteneva solo
+lo scheletro vuoto della pagina, senza dati.
+
+**Scelta di Selenium:**
+Abbiamo usato **Selenium** con Chrome in modalità headless per simulare un
+browser reale e attendere il caricamento completo della tabella. Questo ha
+risolto il problema del contenuto dinamico.
+
+**Filtri applicati:**
+- **Data:** lo scraper naviga tutte le pagine dello storico e scarta
+  automaticamente le delibere con data anteriore al 12/04/2024.
+- **Tipo:** vengono tenute solo le righe il cui campo "Tipo" contiene la
+  parola "Delibere" (quindi "Delibere di Giunta" e "Delibere di Consiglio").
+
+**Allegati:**
+Anche qui gli allegati vengono scaricati dalla pagina di dettaglio e salvati
+in `allegati/fonte2/<Numero atto>/`. Il riferimento è tracciabile dal CSV.
+
+---
+
+## Fase 2 – Normalizzazione
+
+### Obiettivo
+Creare un tracciato di mezzo unico che unifichi i dati delle due fonti,
+applicando tutte le pulizie necessarie.
+
+### Perché un tracciato di mezzo
+L'azienda ha chiesto esplicitamente uno strato intermedio che disaccoppi
+l'estrazione dal caricamento. Il tracciato di mezzo è un CSV con una
+struttura fissa e indipendente dalle fonti: se in futuro si aggiungerà un
+nuovo portale, basterà aggiornare lo scraper e la normalizzazione, senza
+toccare il caricamento su MySQL.
+
+### Operazioni di pulizia effettuate
+
+**Fonte 1 – Rimozione atti annullati:**
+Abbiamo filtrato via tutti i record con `link_dettaglio` vuoto (che sono
+proprio gli atti annullati) e quelli con `numero_reg` che inizia per
+"Pubblicazione" (le righe di spiegazione). In totale sono state rimosse
+262 righe.
+
+**Fonte 2 – Estrazione del tipo atto:**
+Il campo `tipo` nel CSV grezzo della Fonte 2 conteneva un blocco di testo
+con numero pubblicazione, mittente e tipo (es. "579\nMittente\n...\nTipo\n
+Delibere di Giunta"). Abbiamo estratto solo la parte dopo "Tipo\n" con
+un'espressione regolare.
+
+**Date e codifica:**
+Tutte le date sono state convertite in formato `YYYY-MM-DD`. L'encoding
+è UTF-8 su tutti i CSV.
+
+### Struttura del tracciato di mezzo
+Il CSV finale contiene 10 colonne comuni: `id_fonte`, `numero_pubblicazione`,
+`tipo_atto`, `numero_atto`, `data_atto`, `oggetto`, `data_pubblicazione`,
+`data_scadenza`, `url_documento`, `allegati`. Ogni campo è mappato dalle
+colonne originali delle due fonti (dove disponibile).
+
+Il tracciato di mezzo contiene **4.055 righe totali** (3.595 dalla Fonte 1
+e 460 dalla Fonte 2).
+
+---
+
+## Fase 3 – Load su MySQL
+
+### Obiettivo
+Popolare il database MySQL `intermediMC` con i dati del tracciato di mezzo.
+
+### Preparazione dell'ambiente
+Abbiamo utilizzato **XAMPP** per avviare un server MySQL in locale. Dopo aver
+risolto un problema tecnico con i file di log di InnoDB che impedivano l'avvio
+di MySQL, il server è partito correttamente sulla porta **3306**.
+
+Tramite **HeidiSQL** ci siamo connessi al server (`localhost:3306`, utente
+`root`, senza password) e abbiamo importato il file `intermediMC.sql` (fornito
+dall'azienda) per creare il database e le tabelle necessarie. Le tabelle sono
+state create vuote e pronte per essere popolate.
+
+### Nota sulle credenziali
+In questo progetto non è stato usato un file `.env` per
+proteggere le credenziali del database perché, trattandosi di una prova pratica con
+un server MySQL locale e credenziali di default (`root` senza password), non c'erano
+dati sensibili da proteggere. In un ambiente di produzione, le credenziali andrebbero
+inserite in un file `.env` separato ed escluso dal versionamento tramite `.gitignore`.
+
+### Script di caricamento
+Lo script `load/carica_mysql.py`:
+1. Si connette a MySQL su `localhost:3306` (utente `root`, senza password).
+2. Legge il tracciato di mezzo con pandas.
+3. Per ogni riga, genera un numero progressivo di pubblicazione e calcola
+   l'anno di riferimento.
+4. Inserisce un record nella tabella `mcputerecupubbinte` (atti).
+5. Per ogni atto, inserisce il documento principale e gli allegati nella
+   tabella `mcrecorecuallepubb`, collegandoli tramite la coppia
+   `(PBU_NUM, PBU_ANN)`.
+
+### Risultato finale
+- **4.055 atti** inseriti in `mcputerecupubbinte`
+- **9.159 documenti/allegati** inseriti in `mcrecorecuallepubb`
+- La terza tabella (`mcreterecuanag`) è rimasta vuota perché non avevamo
+  dati anagrafici da inserire.
+
+---
+
+## Verifica e controllo qualità
+
+La correttezza del lavoro è stata verificata in più passaggi, sia automatici
+che manuali:
+
+- **Durante l'estrazione:** i log mostravano il numero di righe trovate e il
+  numero di record validi dopo i filtri.
+
+- **Dopo la normalizzazione:** abbiamo aperto i CSV in VS Code e controllato
+  a campione che i dati fossero coerenti (date, tipi, allegati).
+
+- **Dopo il caricamento MySQL:** abbiamo eseguito query per
+  verificare che il numero di record corrispondesse a quello del tracciato.
+
+- **Sui filtri della Fonte 2:** abbiamo verificato manualmente che tutte le
+  date fossero ≥ 12/04/2024 e che tutti i tipi contenessero "Delibere".
+
+- **Sugli allegati:** abbiamo controllato che i percorsi nel CSV puntassero
+  a file effettivamente esistenti nelle cartelle `allegati/`.
+
+Tutto è risultato coerente e corretto.
+
+---
+
+## Riusabilità
+
+L'intero progetto è stato pensato per essere riutilizzabile in contesti simili:
+
+- La classe `BaseScraper` può essere estesa per nuovi portali.
+- Il file `config/sources.yaml` separa i parametri variabili (URL, selettori)
+  dal codice Python.
+- Le tre fasi (E, T, L) sono indipendenti: si può modificare una senza
+  impattare le altre.
+- Il tracciato di mezzo è un contratto stabile: aggiungere una terza fonte
+  significa solo aggiornare l'estrazione e la normalizzazione.
+
+---
+## Istruzioni per l'esecuzione
+
+### 1. Installare le dipendenze
+```bash
+pip install -r requirements.txt
+
+# Estrazione
+python extract/estrai_fonte1.py
+python extract/estrai_fonte2.py
+
+# Normalizzazione
+python transform/normalizza.py
+
+# Caricamento su MySQL
+python load/carica_mysql.py
+
+*Progetto realizzato da Mattia come prova pratica di tirocinio per Halley Sud, 29 maggio 2026.*

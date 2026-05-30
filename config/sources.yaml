@@ -1,0 +1,38 @@
+fonte1:
+  name: "ASMENET Squillace"
+  base_url: "http://albosquillace.asmenet.it"
+  list_url: "/cercaArchivio.php?arch=ok&sez="
+  pagination: false
+  table_selector: "table.tablesorter"
+  row_selector: "tbody tr"
+  fields:
+    numero_reg: "td:nth-child(1)"
+    tipo: "td:nth-child(2)"
+    ente: "td:nth-child(3)"
+    oggetto: "td:nth-child(4)"
+    data_pubblicazione: "td:nth-child(5)"
+    data_scadenza: "td:nth-child(6)"
+    link_dettaglio: "td:nth-child(7) a"
+  annullato:
+    style_contains: "text-decoration: line-through"
+    skip_next_row: true
+  dettaglio_table_selector: "table.tablesorter:nth-of-type(2)"
+  dettaglio_allegato_row: "tbody tr"
+  dettaglio_nome_file: "td:nth-child(1)"
+  dettaglio_link_download: "td:nth-child(2) a"
+
+fonte2:
+  name: "Halley Squillace"
+  base_url: "https://portale5.halleysud.it"
+  list_url: "/squillace/mc/mc_p_ricerca.php?multiente=squillace&multiente=squillace&servizio=&sto=1"
+  pagination: true
+  pagination_param: "pag"
+  pagination_start: 0
+  row_selector: "#table-albo tbody tr"
+  fields:
+    tipo: "td:nth-child(1)"
+    oggetto: "td:nth-child(2) a"
+    numero_atto: "td:nth-child(3)"
+    documento_principale: "td:nth-child(6) a[onclick*='mc_attachment.php']"
+  filter_tipo: "Delibere"
+  dettaglio_allegato_selector: "a[onclick*='mc_attachment.php']"
