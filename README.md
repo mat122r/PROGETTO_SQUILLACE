@@ -32,13 +32,12 @@ che sono state individuate e corrette strada facendo:
 
 In tutti i casi, la verifica manuale dei log e dei CSV ha permesso di
 confermare la bontà delle correzioni prima di procedere.
+
 ---
 
-
-## Struttura del progetto squillace
+## Struttura del progetto
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
-
 
 ### Cartella principale
 - `README.md`
@@ -100,8 +99,7 @@ statica, quindi è stato possibile usare `requests` e `BeautifulSoup` per
 scaricare la pagina e fare il parsing.
 
 **Scelte tecniche:**
-- La pagina è molto pesante: abbiamo aumentato il timeout HTTP a 120 secondi
-  per evitare errori di timeout durante il download.
+- La pagina è molto pesante, quindi abbiamo aumentato il timeout HTTP a 120 secondi.
 - Gli allegati si trovano su una seconda pagina di dettaglio (raggiungibile
   tramite un link nella tabella principale). Per ogni atto lo scraper visita
   il dettaglio e scarica i PDF.
@@ -109,14 +107,9 @@ scaricare la pagina e fare il parsing.
   numero di registrazione, in modo che sia sempre possibile risalire dal
   record al file.
 
-**Problema riscontrato – atti annullati:**
-La tabella contiene anche atti annullati (righe con stile barrato e una riga
-successiva di spiegazione). Inizialmente avevamo previsto di escluderli già
-in fase di scraping controllando lo stile `text-decoration: line-through`,
-ma questo stile è applicato alle singole celle e non alla riga intera, quindi
-il controllo non ha funzionato. Abbiamo deciso di estrarre tutto (compresi gli
-annullati) e di rimuoverli nella fase di normalizzazione, dove è più facile
-filtrare i record senza link al dettaglio.
+**Atti annullati:**
+Come anticipato, gli atti annullati sono stati estratti insieme agli altri
+e rimossi nella fase di normalizzazione.
 
 ### Fonte 2 – Portale dinamico (solo delibere dal 12/04/2024)
 Il secondo portale ha una tabella che viene **caricata dinamicamente via
@@ -162,10 +155,8 @@ proprio gli atti annullati) e quelli con `numero_reg` che inizia per
 262 righe.
 
 **Fonte 2 – Estrazione del tipo atto:**
-Il campo `tipo` nel CSV grezzo della Fonte 2 conteneva un blocco di testo
-con numero pubblicazione, mittente e tipo (es. "579\nMittente\n...\nTipo\n
-Delibere di Giunta"). Abbiamo estratto solo la parte dopo "Tipo\n" con
-un'espressione regolare.
+Come accennato, il parsing è stato corretto per estrarre solo la parte
+dopo `"Tipo\n"`.
 
 **Date e codifica:**
 Tutte le date sono state convertite in formato `YYYY-MM-DD`. L'encoding
