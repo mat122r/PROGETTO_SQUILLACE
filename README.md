@@ -34,6 +34,7 @@ In tutti i casi, la verifica manuale dei log e dei CSV ha permesso di
 confermare la bontà delle correzioni prima di procedere.
 ---
 
+
 ## Struttura del progetto squillace
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
