@@ -14,6 +14,24 @@ fatte per superarle.
 | **Antigravity** (con Claude Sonnet e Gemini 3.5 Flash High) | Ha generato la struttura iniziale del codice e i primi script funzionanti. È stato il punto di partenza per tutte e tre le fasi. |
 | **DeepSeek** | Ha accompagnato l'intero sviluppo come supporto critico: ha verificato il codice, suggerito correzioni, aiutato a interpretare i log e monitorato la coerenza dei dati. Ha svolto il ruolo di "revisore" del lavoro di Antigravity. |
 
+### Errori e correzioni
+
+Durante lo sviluppo, gli agenti hanno commesso alcune piccole imprecisioni
+che sono state individuate e corrette strada facendo:
+
+- **Atti annullati**: in fase di scraping, il tentativo di escludere subito
+  gli atti annullati non ha funzionato perché lo stile barrato era applicato
+  alle celle e non alla riga intera. Si è quindi deciso di rimandare la
+  pulizia alla normalizzazione, dove è più semplice filtrare i record senza
+  link al dettaglio.
+- **Timeout HTTP**: il timeout predefinito non bastava per scaricare la
+  pagina più grande ed è stato portato a 120 secondi.
+- **Parsing del tipo atto**: per la seconda fonte è stato necessario
+  correggere l'espressione regolare per estrarre solo il testo dopo
+  `"Tipo\n"`.
+
+In tutti i casi, la verifica manuale dei log e dei CSV ha permesso di
+confermare la bontà delle correzioni prima di procedere.
 ---
 
 ## Struttura del progetto squillace
