@@ -20,37 +20,41 @@ fatte per superarle.
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
 
+## Struttura del progetto
+
 ### Cartella principale
-- README.md
-- requirements.txt
-- intermediMC.sql
+- `README.md`
+- `requirements.txt`
+- `intermediMC.sql`
 
 ### config/
-- sources.yaml
+- `sources.yaml`
 
 ### scrapers/
-- base_scraper.py
-- fonte1_scraper.py
-- fonte2_scraper.py
+- `base_scraper.py`
+- `fonte1_scraper.py`
+- `fonte2_scraper.py`
 
 ### extract/
-- estrai_fonte1.py
-- estrai_fonte2.py
+- `estrai_fonte1.py`
+- `estrai_fonte2.py`
 
 ### transform/
-- normalizza.py
+- `normalizza.py`
 
 ### load/
-- carica_mysql.py
-- check_db.py
-- check_schema.py
+- `carica_mysql.py`
+- `check_db.py`
+- `check_schema.py`
 
 ### data/
-- (CSV generati)
+- `fonte1_raw.csv`
+- `fonte2_raw.csv`
+- `tracciato_mezzo.csv`
 
 ### allegati/
-- fonte1/
-- fonte2/
+- `fonte1/` (PDF primo portale)
+- `fonte2/` (PDF secondo portale)
 
 ---
 
