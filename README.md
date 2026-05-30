@@ -1,5 +1,4 @@
-# Progetto Squillace – Pipeline ETL 
-### Prova pratica di tirocinio – Halley Sud
+# Progetto Squillace – Pipeline ETL
 
 Questo documento racconta l'intero percorso che ha portato alla realizzazione della
 pipeline ETL per il Comune di Squillace: dall'analisi dei portali fino al caricamento
@@ -24,14 +23,14 @@ Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pip
 PROGETTO_SQUILLACE/
 ├── README.md ← questo file
 ├── requirements.txt ← dipendenze Python
-├── intermediMC.sql ← schema MySQL fornito dall'azienda
+├── intermediMC.sql ← schema MySQL di destinazione
 ├── config/
 │ └── sources.yaml ← URL, selettori e parametri di estrazione
 |
 ├── scrapers/ ← Fase 1 – Estrazione
 │ ├── base_scraper.py ← classe base riutilizzabile
-│ ├── fonte1_scraper.py ← scraper per ASMENET
-│ └── fonte2_scraper.py ← scraper per Halley (con Selenium)
+│ ├── fonte1_scraper.py ← scraper per il primo portale
+│ └── fonte2_scraper.py ← scraper per il secondo portale (con Selenium)
 |
 ├── extract/ ← script eseguibili di estrazione
 │ ├── estrai_fonte1.py
@@ -54,8 +53,8 @@ PROGETTO_SQUILLACE/
 ## Fase 1 – Estrazione
 
 ### Obiettivo
-Recuperare tutti gli atti pubblicati dal portale ASMENET e solo le delibere
-dal 12/04/2024 dal portale Halley, compresi gli allegati.
+Recuperare tutti gli atti pubblicati dal primo portale e solo le delibere
+dal 12/04/2024 dal secondo portale, compresi gli allegati.
 
 ### Analisi preliminare dei portali
 Prima di scrivere qualsiasi codice, abbiamo aperto i due siti nel browser e
@@ -68,8 +67,8 @@ individuato:
 - Se la pagina è statica o carica i dati dinamicamente
 - Il meccanismo di paginazione (dove presente)
 
-### Fonte 1 – ASMENET (tutti i dati)
-Il portale ASMENET presenta un archivio storico di 3726 record in una **singola
+### Fonte 1 – Portale statico (tutti i dati)
+Il primo portale presenta un archivio storico di 3726 record in una **singola
 pagina HTML**, senza paginazione. La tabella è molto grande ma completamente
 statica, quindi è stato possibile usare `requests` e `BeautifulSoup` per
 scaricare la pagina e fare il parsing.
@@ -93,8 +92,8 @@ il controllo non ha funzionato. Abbiamo deciso di estrarre tutto (compresi gli
 annullati) e di rimuoverli nella fase di normalizzazione, dove è più facile
 filtrare i record senza link al dettaglio.
 
-### Fonte 2 – Halley (solo delibere dal 12/04/2024)
-Il portale Halley ha una tabella che viene **caricata dinamicamente via
+### Fonte 2 – Portale dinamico (solo delibere dal 12/04/2024)
+Il secondo portale ha una tabella che viene **caricata dinamicamente via
 JavaScript** dopo il caricamento della pagina. Con `requests` si otteneva solo
 lo scheletro vuoto della pagina, senza dati.
 
@@ -122,7 +121,7 @@ Creare un tracciato di mezzo unico che unifichi i dati delle due fonti,
 applicando tutte le pulizie necessarie.
 
 ### Perché un tracciato di mezzo
-L'azienda ha chiesto esplicitamente uno strato intermedio che disaccoppi
+È stato richiesto esplicitamente uno strato intermedio che disaccoppi
 l'estrazione dal caricamento. Il tracciato di mezzo è un CSV con una
 struttura fissa e indipendente dalle fonti: se in futuro si aggiungerà un
 nuovo portale, basterà aggiornare lo scraper e la normalizzazione, senza
@@ -168,16 +167,17 @@ risolto un problema tecnico con i file di log di InnoDB che impedivano l'avvio
 di MySQL, il server è partito correttamente sulla porta **3306**.
 
 Tramite **HeidiSQL** ci siamo connessi al server (`localhost:3306`, utente
-`root`, senza password) e abbiamo importato il file `intermediMC.sql` (fornito
-dall'azienda) per creare il database e le tabelle necessarie. Le tabelle sono
-state create vuote e pronte per essere popolate.
+`root`, senza password) e abbiamo importato il file `intermediMC.sql` per
+creare il database e le tabelle necessarie. Le tabelle sono state create
+vuote e pronte per essere popolate.
 
 ### Nota sulle credenziali
 In questo progetto non è stato usato un file `.env` per
-proteggere le credenziali del database perché, trattandosi di una prova pratica con
-un server MySQL locale e credenziali di default (`root` senza password), non c'erano
-dati sensibili da proteggere. In un ambiente di produzione, le credenziali andrebbero
-inserite in un file `.env` separato ed escluso dal versionamento tramite `.gitignore`.
+proteggere le credenziali del database perché, trattandosi di un ambiente
+di sviluppo locale con credenziali di default (`root` senza password), non
+c'erano dati sensibili da proteggere. In un ambiente di produzione, le
+credenziali andrebbero inserite in un file `.env` separato ed escluso dal
+versionamento tramite `.gitignore`.
 
 ### Script di caricamento
 Lo script `load/carica_mysql.py`:
@@ -251,4 +251,4 @@ python transform/normalizza.py
 # Caricamento su MySQL
 python load/carica_mysql.py
 
-*Progetto realizzato da Mattia come prova pratica di tirocinio per Halley Sud, 29 maggio 2026.*
+*Progetto realizzato da Mattia il 29 maggio 2026.*
