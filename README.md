@@ -16,37 +16,41 @@ fatte per superarle.
 
 ---
 
-## Struttura del progetto
+## Struttura del progetto squillace
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
 
-PROGETTO_SQUILLACE/
-├── README.md ← questo file
-├── requirements.txt ← dipendenze Python
-├── intermediMC.sql ← schema MySQL di destinazione
-├── config/
-│ └── sources.yaml ← URL, selettori e parametri di estrazione
-|
-├── scrapers/ ← Fase 1 – Estrazione
-│ ├── base_scraper.py ← classe base riutilizzabile
-│ ├── fonte1_scraper.py ← scraper per il primo portale
-│ └── fonte2_scraper.py ← scraper per il secondo portale (con Selenium)
-|
-├── extract/ ← script eseguibili di estrazione
-│ ├── estrai_fonte1.py
-│ └── estrai_fonte2.py
-├── transform/ ← Fase 2 – Normalizzazione
-│ └── normalizza.py
-|
-├── load/ ← Fase 3 – Caricamento MySQL
-│ └── carica_mysql.py
-| |__ check_db.py
-| |__ check_schema.py
-|
-├── data/ ← CSV generati (grezzi e tracciato di mezzo)
-└── allegati/ ← PDF scaricati
-├── fonte1/
-└── fonte2/
+### Cartella principale
+- README.md
+- requirements.txt
+- intermediMC.sql
+
+### config/
+- sources.yaml
+
+### scrapers/
+- base_scraper.py
+- fonte1_scraper.py
+- fonte2_scraper.py
+
+### extract/
+- estrai_fonte1.py
+- estrai_fonte2.py
+
+### transform/
+- normalizza.py
+
+### load/
+- carica_mysql.py
+- check_db.py
+- check_schema.py
+
+### data/
+- (CSV generati)
+
+### allegati/
+- fonte1/
+- fonte2/
 
 ---
 
