@@ -39,7 +39,6 @@ confermare la bontà delle correzioni prima di procedere.
 
 Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pipeline (E, T, L), più una cartella per la configurazione e una per i dati.
 
-## Struttura del progetto
 
 ### Cartella principale
 - `README.md`
