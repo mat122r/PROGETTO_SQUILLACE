@@ -279,12 +279,12 @@ Grazie agli orchestratori introdotti nella cartella [`skills/`](skills/), non è
 
 È possibile lanciare l'intera pipeline (Estrai → Normalizza → Carica) con un unico comando:
 
-**Per portali statici (es. ASMENET):**
+**Per portali statici**
 ```bash
 python skills/run_static.py --config config/sources.yaml
 ```
 
-**Per portali dinamici (es. Halley):**
+**Per portali dinamici**
 ```bash
 python skills/run_dynamic.py --config config/sources.yaml
 ```
