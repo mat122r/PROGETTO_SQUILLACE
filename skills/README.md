@@ -9,11 +9,12 @@ passando semplicemente un file di configurazione YAML.
 ## Struttura della cartella
 
 ```
-skills/
+skills/   ← PUNTO DI INGRESSO UNICO (Agent-Ready)
 ├── run_static.py          ← Orchestratore per portali statici (BeautifulSoup)
 ├── run_dynamic.py         ← Orchestratore per portali dinamici (Selenium)
 ├── template_static.yaml   ← Template YAML commentato per portali statici
 ├── template_dynamic.yaml  ← Template YAML commentato per portali dinamici
+├── SKILL.md               ← Manuale nativo per agenti AI (Contratto Core)
 └── README.md              ← Questo file
 ```
 
@@ -37,28 +38,27 @@ skills/
 
 ---
 
-##  Integrazione con i Coding Agent
+## Integrazione Nativa con i Coding Agent
 
-La struttura basata su file YAML è stata progettata specificamente per
-massimizzare l'efficienza dei coding agent (come Claude Code, Codex,
-Antigravity) nei casi futuri.
+La struttura basata su file YAML **è l'interfaccia contrattuale attiva**
+con cui un agente AI (come Antigravity) consuma questo modulo come una
+**Skill**. Non si tratta di un'ipotesi futura: il file `SKILL.md` definisce
+le regole vincolanti che l'agente deve leggere prima di operare.
 
-Il flusso di lavoro collaborativo con un agente AI richiederà pochissimi
-secondi:
+Il contratto stabilisce tre punti fermi:
 
-1. **Input per l'agente** – Si fornisce all'agente il template YAML
-   (`template_static.yaml` o `template_dynamic.yaml`) e il codice HTML
-   della nuova pagina da analizzare.
-2. **Task dell'agente** – Si chiede all'agente di agire come "Scraper
-   Configurator", identificare i selettori CSS corretti e generare il
-   nuovo file YAML (es. `config/nuovo_comune.yaml`).
-3. **Zero codice generato** – L'agente non deve scrivere nuovo codice
-   Python, riducendo a zero il rischio di allucinazioni, bug di sintassi
-   o problemi di timeout. La logica di esecuzione è già blindata negli
-   orchestratori `run_static.py` e `run_dynamic.py`.
-
-In questo modo, il "tool" riutilizzabile non è solo lo script, ma l'intero
-flusso di lavoro standardizzato uomo‑AI.
+1. **L'agente legge `SKILL.md`** – Prima di qualsiasi operazione, l'agente
+   carica le regole del Contratto Core, che definiscono workflow, strumenti
+   disponibili e regole vincolanti.
+2. **L'agente compila il YAML, non scrive Python** – Il template YAML
+   (`template_static.yaml` o `template_dynamic.yaml`) è l'unica interfaccia
+   di configurazione. L'agente identifica i selettori CSS dal codice HTML
+   del portale e popola il file YAML in `config/`.
+3. **Zero codice Python generato da zero** – La logica di esecuzione è
+   già blindata negli orchestratori `run_static.py` e `run_dynamic.py`.
+   Generare nuovi scraper Python è **esplicitamente vietato** dal contratto,
+   eliminando alla radice il rischio di allucinazioni, bug di sintassi e
+   regressioni.
 
 ## Come aggiungere un nuovo portale
 
@@ -109,6 +109,7 @@ Entrambi gli orchestratori accettano le stesse opzioni:
 | Opzione | Descrizione | Default |
 |---------|-------------|---------|
 | `--config PERCORSO` | **(obbligatorio)** Percorso del file YAML | – |
+| `--incremental` | Esecuzione incrementale: processa solo i nuovi atti (delta) | off |
 | `--output-csv PERCORSO` | Percorso del CSV grezzo di output | `data/fonte1_raw.csv` (static) / `data/fonte2_raw.csv` (dynamic) |
 | `--tracciato PERCORSO` | Percorso del tracciato di mezzo | `data/tracciato_mezzo.csv` |
 | `--no-normalize` | Salta la fase di normalizzazione | off |
@@ -135,6 +136,12 @@ python skills/run_dynamic.py --config config/portale_dinamico.yaml \
 python skills/run_static.py --config config/nuovo_portale.yaml \
     --output-csv data/nuovo_portale_raw.csv \
     --tracciato data/nuovo_portale_tracciato.csv
+
+# Pipeline in modalità INCREMENTALE (Isolamento dei soli nuovi atti)
+python skills/run_static.py --config config/nuovo_portale.yaml --incremental
+
+# Solo estrazione dinamica incrementale senza caricamento DB
+python skills/run_dynamic.py --config config/portale_dinamico.yaml --incremental --no-load
 ```
 
 ---
@@ -143,6 +150,11 @@ python skills/run_static.py --config config/nuovo_portale.yaml \
 
 ```
 YAML config
+    │
+    ▼
+[Opzione --incremental (Check File Stato JSON)]
+    Legge data/.last_run_static.json o data/.last_run_dynamic.json
+    → Se attivo: filtra gli atti già processati, procede solo con il delta
     │
     ▼
 [FASE 1] Estrazione
@@ -205,4 +217,4 @@ Le dipendenze principali sono:
 
 ---
 
-*Skills create il 3 giugno 2026 nell'ambito del Progetto Squillace – Pipeline ETL.*
+*Skills create il 3 giugno 2026 nell'ambito del Progetto Squillace – Pipeline ETL. Ultima revisione: 3 giugno 2026.*

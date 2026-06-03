@@ -5,6 +5,12 @@ pipeline ETL per il Comune di Squillace: dall'analisi dei portali fino al carica
 dei dati nel database MySQL, passando per tutte le difficoltà incontrate e le scelte
 fatte per superarle.
 
+Il progetto è strutturato come un ecosistema **Agent-Ready**: il punto di ingresso
+unico per qualsiasi agente AI o operatore umano è la cartella [`skills/`](skills/),
+che contiene gli orchestratori generici guidati da file YAML di configurazione.
+Per aggiungere un nuovo portale comunale non è necessario scrivere codice Python:
+basta compilare un file YAML e lanciare un singolo comando.
+
 ---
 
 ## Agenti AI utilizzati
@@ -43,18 +49,24 @@ Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pip
 - `README.md`
 - `requirements.txt`
 - `intermediMC.sql`
+- `.antigravityrules` ← regole di workspace per agenti AI
+- `.cursorrules` ← regole di workspace per Cursor/Copilot
 
 ### config/
-- `sources.yaml`
+- `sources.yaml` ← configurazioni delle fonti esistenti
+
+### skills/   ← PUNTO DI INGRESSO UNICO (Agent-Ready)
+- `run_static.py` ← orchestratore pipeline completa per portali statici
+- `run_dynamic.py` ← orchestratore pipeline completa per portali dinamici
+- `template_static.yaml` ← template YAML commentato per portali statici
+- `template_dynamic.yaml` ← template YAML commentato per portali dinamici
+- `SKILL.md` ← manuale nativo per agenti AI
+- `README.md` ← guida operativa per utenti umani
 
 ### scrapers/
 - `base_scraper.py`
 - `fonte1_scraper.py`
 - `fonte2_scraper.py`
-
-### extract/
-- `estrai_fonte1.py`
-- `estrai_fonte2.py`
 
 ### transform/
 - `normalizza.py`
@@ -68,6 +80,8 @@ Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pip
 - `fonte1_raw.csv`
 - `fonte2_raw.csv`
 - `tracciato_mezzo.csv`
+- `.last_run_static.json` ← stato incrementale portali statici
+- `.last_run_dynamic.json` ← stato incrementale portali dinamici
 
 ### allegati/
 - `fonte1/` (PDF primo portale)
@@ -130,20 +144,6 @@ risolto il problema del contenuto dinamico.
 **Allegati:**
 Anche qui gli allegati vengono scaricati dalla pagina di dettaglio e salvati
 in `allegati/fonte2/<Numero atto>/`. Il riferimento è tracciabile dal CSV.
-
-
-## Estrazione incrementale (opzione futura)
-
-Al momento la pipeline esegue un'estrazione completa a ogni esecuzione.
-Per aggiungere l'estrazione incrementale (solo nuovi atti), gli orchestratori
-possono essere estesi con un flag `--incremental` che:
-
-- Salvi l'ultimo ID o data processata in un file di stato (es. `.last_run`).
-- Modifichi lo scraper per riprendere da quel punto.
-- In normalizzazione, aggiunga i nuovi record senza duplicati.
-
-Questa funzionalità non è ancora implementata, ma la struttura modulare del
-progetto la rende un'estensione naturale per una release successiva.
 
 
 ---
@@ -274,23 +274,41 @@ L'intero progetto è stato pensato per essere riutilizzabile in contesti simili:
 pip install -r requirements.txt
 ```
 
-### 2. Eseguire la pipeline (Singolo comando)
-Grazie agli orchestratori introdotti nella cartella [`skills/`](skills/), non è più necessario eseguire manualmente i singoli script di estrazione, normalizzazione e caricamento. 
+### 2. Eseguire la pipeline (singolo comando)
 
-È possibile lanciare l'intera pipeline (Estrai → Normalizza → Carica) con un unico comando:
+Grazie agli orchestratori nella cartella [`skills/`](skills/), l'intera pipeline
+(Estrai → Normalizza → Carica) si lancia con un unico comando:
 
-**Per portali statici**
+**Portale statico**
 ```bash
 python skills/run_static.py --config config/sources.yaml
 ```
 
-**Per portali dinamici**
+**Portale dinamico**
 ```bash
 python skills/run_dynamic.py --config config/sources.yaml
 ```
 
-Per i dettagli su come creare nuove configurazioni YAML usando i template e per tutte le opzioni avanzate disponibili, consulta la guida dedicata in [`skills/README.md`](skills/README.md).
+### 3. Aggiornamenti periodici – Modalità incrementale
+
+Entrambi gli orchestratori supportano il flag `--incremental`, che elabora
+**solo i nuovi atti** non ancora presenti nel database, saltando automaticamente
+quelli già processati in esecuzioni precedenti:
+
+```bash
+# Aggiorna solo con nuovi atti (portale statico)
+python skills/run_static.py --config config/sources.yaml --incremental
+
+# Aggiorna solo con nuovi atti (portale dinamico)
+python skills/run_dynamic.py --config config/sources.yaml --incremental
+```
+
+Lo stato viene salvato automaticamente in `data/.last_run_static.json` e
+`data/.last_run_dynamic.json` dopo ogni esecuzione.
+
+Per aggiungere un nuovo portale comunale, creare un file YAML in `config/`
+partendo dai template in `skills/` e consultare [`skills/README.md`](skills/README.md).
 
 ---
 
-*Progetto realizzato da Mattia il 29 maggio 2026.*
+*Progetto realizzato da Mattia il 29 maggio 2026. Ultima revisione: 3 giugno 2026.*
