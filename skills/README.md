@@ -37,6 +37,29 @@ skills/
 
 ---
 
+##  Integrazione con i Coding Agent
+
+La struttura basata su file YAML è stata progettata specificamente per
+massimizzare l'efficienza dei coding agent (come Claude Code, Codex,
+Antigravity) nei casi futuri.
+
+Il flusso di lavoro collaborativo con un agente AI richiederà pochissimi
+secondi:
+
+1. **Input per l'agente** – Si fornisce all'agente il template YAML
+   (`template_static.yaml` o `template_dynamic.yaml`) e il codice HTML
+   della nuova pagina da analizzare.
+2. **Task dell'agente** – Si chiede all'agente di agire come "Scraper
+   Configurator", identificare i selettori CSS corretti e generare il
+   nuovo file YAML (es. `config/nuovo_comune.yaml`).
+3. **Zero codice generato** – L'agente non deve scrivere nuovo codice
+   Python, riducendo a zero il rischio di allucinazioni, bug di sintassi
+   o problemi di timeout. La logica di esecuzione è già blindata negli
+   orchestratori `run_static.py` e `run_dynamic.py`.
+
+In questo modo, il "tool" riutilizzabile non è solo lo script, ma l'intero
+flusso di lavoro standardizzato uomo‑AI.
+
 ## Come aggiungere un nuovo portale
 
 ### 1. Copia il template appropriato nella cartella `config/`
