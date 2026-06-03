@@ -272,35 +272,25 @@ L'intero progetto è stato pensato per essere riutilizzabile in contesti simili:
 ### 1. Installare le dipendenze
 ```bash
 pip install -r requirements.txt
-
-# Estrazione
-python extract/estrai_fonte1.py
-python extract/estrai_fonte2.py
-
-# Normalizzazione
-python transform/normalizza.py
-
-# Caricamento su MySQL
-python load/carica_mysql.py
-
-
----
-
-## Skill per il coding agent
-
-La cartella [`skills/`](skills/) contiene gli **orchestratori ETL** che
-permettono di aggiungere un nuovo portale comunale ed eseguire l'intera
-pipeline (Estrai → Normalizza → Carica) con un singolo comando:
-
-```bash
-# Portale statico (BeautifulSoup)
-python skills/run_static.py --config config/nuovo_portale.yaml
-
-# Portale dinamico (Selenium)
-python skills/run_dynamic.py --config config/nuovo_portale_dinamico.yaml
 ```
 
-Per i dettagli su come compilare i template YAML e tutte le opzioni
-disponibili, consulta [`skills/README.md`](skills/README.md).
+### 2. Eseguire la pipeline (Singolo comando)
+Grazie agli orchestratori introdotti nella cartella [`skills/`](skills/), non è più necessario eseguire manualmente i singoli script di estrazione, normalizzazione e caricamento. 
+
+È possibile lanciare l'intera pipeline (Estrai → Normalizza → Carica) con un unico comando:
+
+**Per portali statici (es. ASMENET):**
+```bash
+python skills/run_static.py --config config/sources.yaml
+```
+
+**Per portali dinamici (es. Halley):**
+```bash
+python skills/run_dynamic.py --config config/sources.yaml
+```
+
+Per i dettagli su come creare nuove configurazioni YAML usando i template e per tutte le opzioni avanzate disponibili, consulta la guida dedicata in [`skills/README.md`](skills/README.md).
+
+---
 
 *Progetto realizzato da Mattia il 29 maggio 2026.*
