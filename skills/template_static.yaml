@@ -1,0 +1,80 @@
+# =============================================================================
+# Template di configurazione per un portale STATICO
+# =============================================================================
+# Copia questo file, rinominalo (es. config/nuovo_portale.yaml) e compila
+# tutti i campi con i valori specifici del nuovo portale.
+#
+# Uso:
+#   python skills/run_static.py --config config/nuovo_portale.yaml
+#
+# I campi contrassegnati con [OBBLIGATORIO] devono essere sempre presenti.
+# I campi contrassegnati con [OPZIONALE] possono essere omessi se non necessari.
+# =============================================================================
+
+# [OBBLIGATORIO] Nome descrittivo del portale (usato nei log)
+name: "Nome del Portale Comunale"
+
+# [OBBLIGATORIO] URL base del portale (senza slash finale)
+base_url: "https://albo.esempio-comune.it"
+
+# [OBBLIGATORIO] URL relativo della pagina con la lista degli atti
+# Verrà concatenato a base_url
+list_url: "/archivio/cerca.php?tipo=atti"
+
+# ---------------------------------------------------------------------------
+# Selettori CSS per la tabella principale
+# ---------------------------------------------------------------------------
+
+# [OBBLIGATORIO] Selettore CSS della tabella che contiene gli atti
+table_selector: "table.tablesorter"
+
+# [OBBLIGATORIO] Selettore CSS delle righe della tabella (relativo alla tabella)
+row_selector: "tbody tr"
+
+# [OBBLIGATORIO] Mappatura campi -> selettori CSS delle celle
+# Per i campi di tipo link (es. link_dettaglio), lo scraper estrae l'attributo href
+fields:
+  numero_reg:        "td:nth-child(1)"        # Numero di registrazione / progressivo
+  tipo:              "td:nth-child(2)"        # Tipo dell'atto
+  ente:              "td:nth-child(3)"        # Ente mittente
+  oggetto:           "td:nth-child(4)"        # Oggetto / descrizione dell'atto
+  data_pubblicazione: "td:nth-child(5)"       # Data di pubblicazione (gg/mm/aaaa)
+  data_scadenza:     "td:nth-child(6)"        # Data di scadenza (gg/mm/aaaa)
+  link_dettaglio:    "td:nth-child(7) a"      # Link alla pagina di dettaglio
+
+# ---------------------------------------------------------------------------
+# Gestione atti annullati [OPZIONALE]
+# ---------------------------------------------------------------------------
+# Alcuni portali marcano gli atti annullati con uno stile CSS (es. barrato).
+# Configurare qui il pattern da cercare nell'attributo "style" della riga.
+annullato:
+  style_contains: "text-decoration: line-through"
+  skip_next_row: true   # true = salta anche la riga successiva all'annullato
+
+# ---------------------------------------------------------------------------
+# Pagina di dettaglio e allegati [OPZIONALE]
+# ---------------------------------------------------------------------------
+# Se il portale ha una pagina di dettaglio con allegati scaricabili,
+# configurare i selettori qui sotto.
+
+# Selettore CSS della tabella degli allegati nella pagina di dettaglio
+dettaglio_table_selector: "table.tablesorter:nth-of-type(2)"
+
+# Selettore CSS delle righe degli allegati nella tabella di dettaglio
+dettaglio_allegato_row: "tbody tr"
+
+# Selettore CSS del nome file nella riga allegato
+dettaglio_nome_file: "td:nth-child(1)"
+
+# Selettore CSS del link di download nella riga allegato
+dettaglio_link_download: "td:nth-child(2) a"
+
+# ---------------------------------------------------------------------------
+# Paginazione [OPZIONALE]
+# ---------------------------------------------------------------------------
+# Impostare a true se il portale ha più pagine di risultati.
+# Per i portali statici con una sola pagina, lasciare a false.
+pagination: false
+# pagination: true
+# pagination_param: "pagina"      # nome del parametro GET per la paginazione
+# pagination_start: 1             # numero della prima pagina

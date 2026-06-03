@@ -1,0 +1,80 @@
+# =============================================================================
+# Template di configurazione per un portale DINAMICO (Selenium)
+# =============================================================================
+# Copia questo file, rinominalo (es. config/nuovo_portale_dinamico.yaml) e
+# compila tutti i campi con i valori specifici del nuovo portale.
+#
+# Uso:
+#   python skills/run_dynamic.py --config config/nuovo_portale_dinamico.yaml
+#
+# REQUISITO: Google Chrome installato + accesso a internet per ChromeDriver.
+#
+# I campi contrassegnati con [OBBLIGATORIO] devono essere sempre presenti.
+# I campi contrassegnati con [OPZIONALE] possono essere omessi se non necessari.
+# =============================================================================
+
+# [OBBLIGATORIO] Nome descrittivo del portale (usato nei log)
+name: "Nome del Portale Dinamico Comunale"
+
+# [OBBLIGATORIO] URL base del portale (senza slash finale)
+base_url: "https://portale.esempio-comune.it"
+
+# [OBBLIGATORIO] URL relativo della pagina di lista atti
+# Verrà concatenato a base_url. Includere eventuali parametri fissi nella query.
+list_url: "/comune/mc/mc_p_ricerca.php?multiente=nomecomune&sto=1"
+
+# ---------------------------------------------------------------------------
+# Selettori CSS per la tabella degli atti (caricata dinamicamente via JS)
+# ---------------------------------------------------------------------------
+
+# [OBBLIGATORIO] Selettore CSS delle righe della tabella atti
+# (Selenium aspetta la comparsa dell'elemento prima del parsing)
+row_selector: "#table-albo tbody tr"
+
+# [OBBLIGATORIO] Mappatura campi -> selettori CSS delle celle
+fields:
+  tipo:              "td:nth-child(1)"                              # Tipo atto
+  oggetto:           "td:nth-child(2) a"                           # Oggetto (link)
+  numero_atto:       "td:nth-child(3)"                             # Numero atto
+  documento_principale: "td:nth-child(6) a[onclick*='mc_attachment.php']"  # Link doc principale
+
+# ---------------------------------------------------------------------------
+# Paginazione [OBBLIGATORIO per portali con più pagine]
+# ---------------------------------------------------------------------------
+
+# true = il portale ha più pagine di risultati
+pagination: true
+
+# Nome del parametro GET usato per la paginazione
+pagination_param: "pag"
+
+# Numero della prima pagina (solitamente 0 o 1)
+pagination_start: 0
+
+# ---------------------------------------------------------------------------
+# Filtri sui dati [OPZIONALE]
+# ---------------------------------------------------------------------------
+
+# Filtra le righe il cui campo "tipo" contiene questa stringa (case-insensitive)
+# Lasciare vuoto o omettere per non filtrare per tipo
+filter_tipo: "Delibere"
+
+# Data minima degli atti da includere (formato gg/mm/aaaa)
+# Lasciare commentato per includere tutti gli atti
+# data_min: "01/01/2024"
+
+# ---------------------------------------------------------------------------
+# Pagina di dettaglio e allegati [OPZIONALE]
+# ---------------------------------------------------------------------------
+# Selettore CSS per i link degli allegati nella pagina di dettaglio
+# (deve selezionare i tag <a> con l'attributo onclick che punta al download)
+dettaglio_allegato_selector: "a[onclick*='mc_attachment.php']"
+
+# ---------------------------------------------------------------------------
+# Impostazioni Selenium avanzate [OPZIONALE]
+# ---------------------------------------------------------------------------
+# Timeout in secondi per l'attesa del caricamento della tabella
+# selenium_timeout: 15
+
+# Pausa in secondi dopo il caricamento della pagina (per JS lento)
+# selenium_sleep: 1

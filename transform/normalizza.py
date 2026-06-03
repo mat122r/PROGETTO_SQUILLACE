@@ -9,11 +9,15 @@ Legge i file grezzi:
 
 Pulisce, allinea le colonne e salva:
   - data/tracciato_mezzo.csv
+
+La funzione pubblica `normalizza()` può essere importata dagli orchestratori
+della cartella skills/ per essere chiamata programmaticamente.
 """
 
 import logging
 import sys
 from pathlib import Path
+from typing import Optional, Union
 
 import pandas as pd
 
@@ -29,7 +33,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Percorsi  (relativi alla radice del progetto)
+# Percorsi di default (relativi alla radice del progetto)
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -145,21 +149,44 @@ def elabora_fonte2(path: Path) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Funzione pubblica – importabile dagli orchestratori
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def normalizza(
+    csv_fonte1: Optional[Union[Path, str]] = None,
+    csv_fonte2: Optional[Union[Path, str]] = None,
+    output_csv: Optional[Union[Path, str]] = None,
+) -> Path:
+    """
+    Esegue la normalizzazione e produce il tracciato di mezzo.
+
+    Parametri
+    ----------
+    csv_fonte1 : percorso del CSV grezzo Fonte 1 (default: data/fonte1_raw.csv)
+    csv_fonte2 : percorso del CSV grezzo Fonte 2 (default: data/fonte2_raw.csv)
+    output_csv : percorso del CSV di output (default: data/tracciato_mezzo.csv)
+
+    Restituisce
+    -----------
+    Path – percorso assoluto del file di output generato.
+    """
+    f1 = Path(csv_fonte1) if csv_fonte1 else FILE_FONTE1
+    f2 = Path(csv_fonte2) if csv_fonte2 else FILE_FONTE2
+    out = Path(output_csv) if output_csv else FILE_OUTPUT
+
     log.info("Avvio normalizzazione – Fase 2")
-    log.info(f"Directory progetto: {BASE_DIR}")
+    log.info(f"  Fonte 1:  {f1}")
+    log.info(f"  Fonte 2:  {f2}")
+    log.info(f"  Output:   {out}")
 
     # Verifica esistenza file
-    for f in (FILE_FONTE1, FILE_FONTE2):
+    for f in (f1, f2):
         if not f.exists():
             log.error(f"File non trovato: {f}")
-            sys.exit(1)
+            raise FileNotFoundError(f"File non trovato: {f}")
 
-    df1 = elabora_fonte1(FILE_FONTE1)
-    df2 = elabora_fonte2(FILE_FONTE2)
+    df1 = elabora_fonte1(f1)
+    df2 = elabora_fonte2(f2)
 
     # --- Unione ---
     log.info("=== UNIONE ===")
@@ -172,11 +199,17 @@ def main() -> None:
     log.info(f"  Distribuzione per fonte:\n{tracciato['id_fonte'].value_counts().to_string()}")
 
     # --- Salvataggio ---
-    FILE_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    tracciato.to_csv(FILE_OUTPUT, index=False, encoding="utf-8", quoting=1)  # QUOTE_ALL
-    log.info(f"  File salvato in: {FILE_OUTPUT}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tracciato.to_csv(out, index=False, encoding="utf-8", quoting=1)  # QUOTE_ALL
+    log.info(f"  File salvato in: {out}")
     log.info("Normalizzazione completata con successo.")
 
+    return out.resolve()
+
+
+# ---------------------------------------------------------------------------
+# Esecuzione diretta (comportamento invariato rispetto alla versione originale)
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main()
+    normalizza()

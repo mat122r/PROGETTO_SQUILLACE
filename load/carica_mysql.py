@@ -9,12 +9,16 @@ Popola: mcputerecupubbinte  (atti)
 
 Il database si connette con il nome fisico "intermedimc.sql"
 (MySQL su Windows ha importato lo schema con il nome del file incluso).
+
+La funzione pubblica `carica()` può essere importata dagli orchestratori
+della cartella skills/ per essere chiamata programmaticamente.
 """
 
 import logging
 import re
 import sys
 from pathlib import Path
+from typing import Optional, Union
 
 import mysql.connector
 import pandas as pd
@@ -31,13 +35,13 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Percorsi
+# Percorsi di default
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 FILE_CSV = BASE_DIR / "data" / "tracciato_mezzo.csv"
 
 # ---------------------------------------------------------------------------
-# Connessione DB
+# Connessione DB di default
 # Il database e' stato importato con il nome "intermedimc.sql" (nome fisico).
 # MySQL su Windows e' case-insensitive, quindi "intermediMC.sql" funziona uguale.
 # ---------------------------------------------------------------------------
@@ -134,27 +138,66 @@ VALUES (%s, %s, %s, %s, %s)
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Funzione pubblica – importabile dagli orchestratori
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def carica(
+    tracciato_csv: Optional[Union[Path, str]] = None,
+    host: Optional[str] = None,
+    user: Optional[str] = None,
+    password: Optional[str] = None,
+    database: Optional[str] = None,
+) -> dict:
+    """
+    Carica il tracciato di mezzo su MySQL.
+
+    Parametri
+    ----------
+    tracciato_csv : percorso del CSV tracciato di mezzo
+                    (default: data/tracciato_mezzo.csv)
+    host          : host MySQL (default: "localhost")
+    user          : utente MySQL (default: "root")
+    password      : password MySQL (default: "")
+    database      : nome database MySQL (default: "intermedimc.sql")
+
+    Restituisce
+    -----------
+    dict con le chiavi:
+        "tot_atti"  – numero di atti inseriti
+        "tot_docs"  – numero di documenti/allegati inseriti
+    """
+    file_csv = Path(tracciato_csv) if tracciato_csv else FILE_CSV
+
+    # Costruisce la configurazione DB partendo dai default e sovrascrivendo
+    # solo i parametri esplicitamente forniti
+    db_config = dict(DB_CONFIG)
+    if host is not None:
+        db_config["host"] = host
+    if user is not None:
+        db_config["user"] = user
+    if password is not None:
+        db_config["password"] = password
+    if database is not None:
+        db_config["database"] = database
+
     log.info("=== FASE 3 - Caricamento MySQL (database: intermediMC) ===")
-    log.info(f"File CSV: {FILE_CSV}")
+    log.info(f"File CSV: {file_csv}")
+    log.info(f"Host MySQL: {db_config['host']} | Database: {db_config['database']}")
 
     # Verifica file CSV
-    if not FILE_CSV.exists():
-        log.error(f"File non trovato: {FILE_CSV}")
-        sys.exit(1)
+    if not file_csv.exists():
+        log.error(f"File non trovato: {file_csv}")
+        raise FileNotFoundError(f"File non trovato: {file_csv}")
 
     # Connessione MySQL
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
+        conn = mysql.connector.connect(**db_config)
         conn.autocommit = False
         cur = conn.cursor()
         log.info("Connessione a MySQL riuscita (database: intermediMC)")
     except mysql.connector.Error as exc:
         log.error(f"Errore di connessione MySQL: {exc}")
-        sys.exit(1)
+        raise
 
     # Verifica tabelle vuote
     for t in ("mcputerecupubbinte", "mcrecorecuallepubb"):
@@ -164,7 +207,7 @@ def main() -> None:
             log.warning(f"Tabella {t} contiene gia' {n} righe - procedo comunque.")
 
     # Lettura CSV
-    df = pd.read_csv(FILE_CSV, dtype=str, encoding="utf-8")
+    df = pd.read_csv(file_csv, dtype=str, encoding="utf-8")
     totale = len(df)
     log.info(f"Righe nel tracciato di mezzo: {totale}")
 
@@ -249,6 +292,12 @@ def main() -> None:
     cur.close()
     conn.close()
 
+    return {"tot_atti": tot_atti, "tot_docs": tot_docs}
+
+
+# ---------------------------------------------------------------------------
+# Esecuzione diretta (comportamento invariato rispetto alla versione originale)
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main()
+    carica()
