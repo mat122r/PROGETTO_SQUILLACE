@@ -131,6 +131,21 @@ risolto il problema del contenuto dinamico.
 Anche qui gli allegati vengono scaricati dalla pagina di dettaglio e salvati
 in `allegati/fonte2/<Numero atto>/`. Il riferimento è tracciabile dal CSV.
 
+
+## Estrazione incrementale (opzione futura)
+
+Al momento la pipeline esegue un'estrazione completa a ogni esecuzione.
+Per aggiungere l'estrazione incrementale (solo nuovi atti), gli orchestratori
+possono essere estesi con un flag `--incremental` che:
+
+- Salvi l'ultimo ID o data processata in un file di stato (es. `.last_run`).
+- Modifichi lo scraper per riprendere da quel punto.
+- In normalizzazione, aggiunga i nuovi record senza duplicati.
+
+Questa funzionalità non è ancora implementata, ma la struttura modulare del
+progetto la rende un'estensione naturale per una release successiva.
+
+
 ---
 
 ## Fase 2 – Normalizzazione
