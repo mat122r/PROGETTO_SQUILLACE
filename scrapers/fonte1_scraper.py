@@ -39,18 +39,25 @@ class Fonte1Scraper(BaseScraper):
         return filename
 
     def run(self):
-        logger.info("Starting scraper for Fonte 1: ASMENET Squillace")
+        logger.info("Avvio scraper per Fonte 1: ASMENET Squillace")
         
-        # Load the main list page
+        # Carica la pagina principale con la lista degli atti
         list_url = urljoin(self.base_url, self.config['list_url'])
         soup = self.fetch_page(list_url)
+
+        # Gestione esplicita del caso in cui il server non risponde
+        if soup is None:
+            raise ConnectionError(
+                "Il server del comune è temporaneamente lento o non risponde. "
+                "Salto la fonte corrente."
+            )
         
         # Find the table containing the acts
         table_selector = self.config['table_selector']
         table = soup.select_one(table_selector)
         if not table:
-            logger.error(f"Could not find table with selector: {table_selector}")
-            raise Exception("Main data table not found.")
+            logger.error(f"Tabella non trovata con selettore: {table_selector}")
+            raise Exception("Tabella principale non trovata.")
 
         row_selector = self.config['row_selector']
         rows = table.select(row_selector)
@@ -101,16 +108,29 @@ class Fonte1Scraper(BaseScraper):
             record['data_pubblicazione_normalizzata'] = self.normalize_date(record.get('data_pubblicazione', ''))
             record['data_scadenza_normalizzata'] = self.normalize_date(record.get('data_scadenza', ''))
 
-            # Visit detail page to retrieve attachments
+            # Controllo early exit per la modalità incrementale
+            # La chiave è solo numero_reg, in linea con _build_key di run_static.py
+            if hasattr(self, 'keys_to_skip') and self.keys_to_skip:
+                current_key = str(numero_reg).strip()
+                if current_key in self.keys_to_skip:
+                    logger.info("Raggiunto record già processato. Interruzione incrementale.")
+                    break
+
+            # Visita la pagina di dettaglio per recuperare gli allegati
             detail_rel_url = record.get('link_dettaglio', '')
             downloaded_paths = []
 
             if detail_rel_url:
                 detail_url = urljoin(self.base_url, detail_rel_url)
-                # Save link_dettaglio as absolute url
+                # Salva link_dettaglio come URL assoluto
                 record['link_dettaglio'] = detail_url
                 try:
                     detail_soup = self.fetch_page(detail_url)
+                    if detail_soup is None:
+                        logger.warning(f"Pagina dettaglio non raggiungibile per reg. {numero_reg}. Allegati saltati.")
+                        record['allegati'] = ""
+                        records.append(record)
+                        continue
                     dettaglio_table_selector = self.config['dettaglio_table_selector']
                     dettaglio_table = detail_soup.select_one(dettaglio_table_selector)
                     

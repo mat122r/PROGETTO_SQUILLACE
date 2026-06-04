@@ -1,4 +1,5 @@
 fonte1:
+  tipo: "static"                              # statico: requests + BeautifulSoup
   name: "ASMENET Squillace"
   base_url: "http://albosquillace.asmenet.it"
   list_url: "/cercaArchivio.php?arch=ok&sez="
@@ -22,6 +23,7 @@ fonte1:
   dettaglio_link_download: "td:nth-child(2) a"
 
 fonte2:
+  tipo: "dynamic"                             # dinamico: Selenium + Chrome headless
   name: "Halley Squillace"
   base_url: "https://portale5.halleysud.it"
   list_url: "/squillace/mc/mc_p_ricerca.php?multiente=squillace&multiente=squillace&servizio=&sto=1"
@@ -36,3 +38,26 @@ fonte2:
     documento_principale: "td:nth-child(6) a[onclick*='mc_attachment.php']"
   filter_tipo: "Delibere"
   dettaglio_allegato_selector: "a[onclick*='mc_attachment.php']"
+
+# ---------------------------------------------------------------------------
+# Per aggiungere un nuovo comune: aggiungi qui una sezione fonte3, fonte4...
+# Il campo "tipo" puo' essere "static" o "dynamic".
+# Il Master Orchestrator la includera' automaticamente al prossimo lancio.
+#
+# Esempio Comune di Borgia (portale statico):
+#
+# fonte3:
+#   tipo: "static"
+#   name: "Comune di Borgia - Albo Pretorio"
+#   base_url: "https://albo.comune.borgia.cz.it"
+#   list_url: "/archivio/cerca.php"
+#   table_selector: "table.tablesorter"
+#   row_selector: "tbody tr"
+#   fields:
+#     numero_reg: "td:nth-child(1)"
+#     tipo:       "td:nth-child(2)"
+#     oggetto:    "td:nth-child(4)"
+#     data_pubblicazione: "td:nth-child(5)"
+#     data_scadenza:      "td:nth-child(6)"
+#     link_dettaglio:     "td:nth-child(7) a"
+# ---------------------------------------------------------------------------

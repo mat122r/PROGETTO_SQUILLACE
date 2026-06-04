@@ -1,45 +1,67 @@
 # Progetto Squillace – Pipeline ETL
 
-Questo documento racconta l'intero percorso che ha portato alla realizzazione della
-pipeline ETL per il Comune di Squillace: dall'analisi dei portali fino al caricamento
-dei dati nel database MySQL, passando per tutte le difficoltà incontrate e le scelte
-fatte per superarle.
-
-Il progetto è strutturato come un ecosistema **Agent-Ready**: il punto di ingresso
-unico per qualsiasi agente AI o operatore umano è la cartella [`skills/`](skills/),
-che contiene gli orchestratori generici guidati da file YAML di configurazione.
-Per aggiungere un nuovo portale comunale non è necessario scrivere codice Python:
-basta compilare un file YAML e lanciare un singolo comando.
+Pipeline ETL per estrarre atti amministrativi da portali comunali, normalizzarli e
+caricarli su MySQL. Supporta portali statici (BeautifulSoup) e dinamici (Selenium),
+scala a N comuni modificando solo un file YAML, zero codice Python da scrivere.
 
 ---
 
-## Agenti AI utilizzati
+## 🚀 START HERE — Avvio rapido in 4 passi
 
-| Agente / Modello | Ruolo nel progetto |
-|------------------|-------------------|
-| **Antigravity** (con Claude Sonnet e Gemini 3.5 Flash High) | Ha generato la struttura iniziale del codice e i primi script funzionanti. È stato il punto di partenza per tutte e tre le fasi. |
-| **DeepSeek** | Ha accompagnato l'intero sviluppo come supporto critico: ha verificato il codice, suggerito correzioni, aiutato a interpretare i log e monitorato la coerenza dei dati. Ha svolto il ruolo di "revisore" del lavoro di Antigravity. |
+> Prima di leggere qualsiasi altra cosa, esegui questi comandi nell'ordine.
 
-### Errori e correzioni
+**Prerequisiti (una volta sola):**
+1. Avvia **XAMPP** → Start MySQL
+2. Apri HeidiSQL → importa `intermediMC.sql` → si crea il database `intermediMC`
 
-Durante lo sviluppo, gli agenti hanno commesso alcune piccole imprecisioni
-che sono state individuate e corrette strada facendo:
+**Da terminale nella cartella del progetto:**
 
-- **Atti annullati**: in fase di scraping, il tentativo di escludere subito
-  gli atti annullati non ha funzionato perché lo stile barrato era applicato
-  alle celle e non alla riga intera. Si è quindi deciso di rimandare la
-  pulizia alla normalizzazione, dove è più semplice filtrare i record senza
-  link al dettaglio.
-- **Timeout HTTP**: il timeout predefinito non bastava per scaricare la
-  pagina più grande ed è stato portato a 120 secondi.
-- **Parsing del tipo atto**: per la seconda fonte è stato necessario
-  correggere l'espressione regolare per estrarre solo il testo dopo
-  `"Tipo\n"`.
+```bash
+# 1. Installa le dipendenze
+pip install -r requirements.txt
 
-In tutti i casi, la verifica manuale dei log e dei CSV ha permesso di
-confermare la bontà delle correzioni prima di procedere.
+# 2. Verifica che tutto sia pronto
+python skills/run_pipeline.py --check
+
+# 3. Prima estrazione completa (E → T → L per tutti i comuni)
+python skills/run_pipeline.py
+
+# 4. Aggiornamenti successivi (solo nuovi atti, nessun duplicato)
+python skills/run_pipeline.py --incremental
+```
+
+> ⚠️ Il server ASMENET impiega 4-5 minuti per rispondere. Il processo non è bloccato: attendi senza interrompere.
 
 ---
+
+## 🗺️ Mappa dei file — cosa leggere e in che ordine
+
+| Priorità | File | Cosa contiene |
+|----------|------|---------------|
+| **1° LEGGI** | Questo file | Struttura del progetto, fasi E/T/L, istruzioni complete |
+| **2° LEGGI** | [`DIARIO_PROCESSO.md`](DIARIO_PROCESSO.md) | Come è stato sviluppato, errori corretti, guida al riutilizzo |
+| **3° se usi skills** | [`skills/README.md`](skills/README.md) | Come aggiungere nuovi portali, opzioni avanzate CLI |
+| **Solo per agenti AI** | [`skills/SKILL.md`](skills/SKILL.md) | Contratto operativo macchina-leggibile |
+| **Config fonti** | [`config/sources.yaml`](config/sources.yaml) | Unico file da modificare per aggiungere comuni |
+
+---
+
+## 📁 Perché questi file sono separati — la logica della documentazione
+
+Il progetto adotta una documentazione multi-file: ogni documento ha un'audience specifica e un contenuto esclusivo, così da non mescolare livelli diversi di lettura.
+
+| File | Audience | Perché esiste |
+|------|----------|-----------------|
+| **`README.md`** (questo) | Umano — primo approccio | Orientamento rapido: struttura, fasi E/T/L, come avviare la pipeline. È il punto di ingresso per chiunque scopra il progetto per la prima volta. |
+| **`DIARIO_PROCESSO.md`** | Umano — revisore del processo | Racconta *come* è stato sviluppato: quale agente, dove ha sbagliato, come è stato corretto e verificato. Documento narrativo, non operativo. |
+| **`skills/README.md`** | Umano tecnico che vuole estendere il sistema | Guida operativa step-by-step per aggiungere un nuovo comune o portale. Sta in `skills/` perché è la documentazione del modulo riutilizzabile. |
+| **`skills/SKILL.md`** | **Agente AI (coding agent)** | Contratto macchina-leggibile: trigger di attivazione, workflow obbligatorio, regole MUST. L'agente lo legge *prima* di qualsiasi operazione. È il motivo per cui la prossima volta che arriva un caso simile basta un prompt, non un progetto da zero. |
+
+> **In sintesi:** `README.md` spiega *cosa è*. `DIARIO_PROCESSO.md` racconta *come è stato fatto*. `skills/README.md` insegna *come estenderlo*. `skills/SKILL.md` *fa operare l'agente AI* senza intervento umano.
+
+---
+
+
 
 ## Struttura del progetto
 
@@ -56,8 +78,9 @@ Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pip
 - `sources.yaml` ← configurazioni delle fonti esistenti
 
 ### skills/   ← PUNTO DI INGRESSO UNICO (Agent-Ready)
-- `run_static.py` ← orchestratore pipeline completa per portali statici
-- `run_dynamic.py` ← orchestratore pipeline completa per portali dinamici
+- `run_pipeline.py` ← **MASTER ORCHESTRATOR** – lancia tutta la pipeline multifonte con un comando
+- `run_static.py` ← sotto-orchestratore per portali statici (usato dal Master)
+- `run_dynamic.py` ← sotto-orchestratore per portali dinamici (usato dal Master)
 - `template_static.yaml` ← template YAML commentato per portali statici
 - `template_dynamic.yaml` ← template YAML commentato per portali dinamici
 - `SKILL.md` ← manuale nativo per agenti AI
@@ -73,8 +96,6 @@ Tutti i file sono organizzati in cartelle che rispecchiano le tre fasi della pip
 
 ### load/
 - `carica_mysql.py`
-- `check_db.py`
-- `check_schema.py`
 
 ### data/
 - `fonte1_raw.csv`
@@ -199,21 +220,19 @@ risolto un problema tecnico con i file di log di InnoDB che impedivano l'avvio
 di MySQL, il server è partito correttamente sulla porta **3306**.
 
 Tramite **HeidiSQL** ci siamo connessi al server (`localhost:3306`, utente
-`root`, senza password) e abbiamo importato il file `intermediMC.sql` per
+`root`, password `admin`) e abbiamo importato il file `intermediMC.sql` per
 creare il database e le tabelle necessarie. Le tabelle sono state create
 vuote e pronte per essere popolate.
 
 ### Nota sulle credenziali
-In questo progetto non è stato usato un file `.env` per
-proteggere le credenziali del database perché, trattandosi di un ambiente
-di sviluppo locale con credenziali di default (`root` senza password), non
-c'erano dati sensibili da proteggere. In un ambiente di produzione, le
-credenziali andrebbero inserite in un file `.env` separato ed escluso dal
-versionamento tramite `.gitignore`.
+Le credenziali utilizzate sono `root` / `admin`, adatte all'ambiente di
+sviluppo locale. In un ambiente di produzione, le credenziali andrebbero
+inserite in un file `.env` separato ed escluso dal versionamento tramite
+`.gitignore`.
 
 ### Script di caricamento
 Lo script `load/carica_mysql.py`:
-1. Si connette a MySQL su `localhost:3306` (utente `root`, senza password).
+1. Si connette a MySQL su `localhost:3306` (utente `root`, password `admin`).
 2. Legge il tracciato di mezzo con pandas.
 3. Per ogni riga, genera un numero progressivo di pubblicazione e calcola
    l'anno di riferimento.
@@ -230,85 +249,9 @@ Lo script `load/carica_mysql.py`:
 
 ---
 
-## Verifica e controllo qualità
 
-La correttezza del lavoro è stata verificata in più passaggi, sia automatici
-che manuali:
-
-- **Durante l'estrazione:** i log mostravano il numero di righe trovate e il
-  numero di record validi dopo i filtri.
-
-- **Dopo la normalizzazione:** abbiamo aperto i CSV in VS Code e controllato
-  a campione che i dati fossero coerenti (date, tipi, allegati).
-
-- **Dopo il caricamento MySQL:** abbiamo eseguito query per
-  verificare che il numero di record corrispondesse a quello del tracciato.
-
-- **Sui filtri della Fonte 2:** abbiamo verificato manualmente che tutte le
-  date fossero ≥ 12/04/2024 e che tutti i tipi contenessero "Delibere".
-
-- **Sugli allegati:** abbiamo controllato che i percorsi nel CSV puntassero
-  a file effettivamente esistenti nelle cartelle `allegati/`.
-
-Tutto è risultato coerente e corretto.
 
 ---
+*Progetto realizzato da Mattia Cannavò | 29 maggio 2026. Ultima revisione: 4 giugno 2026*
 
-## Riusabilità
-
-L'intero progetto è stato pensato per essere riutilizzabile in contesti simili:
-
-- La classe `BaseScraper` può essere estesa per nuovi portali.
-- Il file `config/sources.yaml` separa i parametri variabili (URL, selettori)
-  dal codice Python.
-- Le tre fasi (E, T, L) sono indipendenti: si può modificare una senza
-  impattare le altre.
-- Il tracciato di mezzo è un contratto stabile: aggiungere una terza fonte
-  significa solo aggiornare l'estrazione e la normalizzazione.
-
----
-## Istruzioni per l'esecuzione
-
-### 1. Installare le dipendenze
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Eseguire la pipeline (singolo comando)
-
-Grazie agli orchestratori nella cartella [`skills/`](skills/), l'intera pipeline
-(Estrai → Normalizza → Carica) si lancia con un unico comando:
-
-**Portale statico**
-```bash
-python skills/run_static.py --config config/sources.yaml
-```
-
-**Portale dinamico**
-```bash
-python skills/run_dynamic.py --config config/sources.yaml
-```
-
-### 3. Aggiornamenti periodici – Modalità incrementale
-
-Entrambi gli orchestratori supportano il flag `--incremental`, che elabora
-**solo i nuovi atti** non ancora presenti nel database, saltando automaticamente
-quelli già processati in esecuzioni precedenti:
-
-```bash
-# Aggiorna solo con nuovi atti (portale statico)
-python skills/run_static.py --config config/sources.yaml --incremental
-
-# Aggiorna solo con nuovi atti (portale dinamico)
-python skills/run_dynamic.py --config config/sources.yaml --incremental
-```
-
-Lo stato viene salvato automaticamente in `data/.last_run_static.json` e
-`data/.last_run_dynamic.json` dopo ogni esecuzione.
-
-Per aggiungere un nuovo portale comunale, creare un file YAML in `config/`
-partendo dai template in `skills/` e consultare [`skills/README.md`](skills/README.md).
-
----
-
-*Progetto realizzato da Mattia il 29 maggio 2026. Ultima revisione: 3 giugno 2026.*
+> Per il racconto dettagliato del processo di sviluppo, degli errori corretti e della strategia di verifica, leggi [`DIARIO_PROCESSO.md`](DIARIO_PROCESSO.md).

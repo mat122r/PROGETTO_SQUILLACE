@@ -22,6 +22,10 @@ from typing import Optional, Set
 import pandas as pd
 import yaml
 
+# Fix encoding per terminali Windows (cp1252 non supporta caratteri Unicode)
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 # ---------------------------------------------------------------------------
 # Percorso radice del progetto (due livelli sopra questo file)
 # ---------------------------------------------------------------------------
@@ -127,7 +131,15 @@ def _filtra_incrementale(csv_path: str, chiavi_processate: Set[str]):
     con i soli nuovi record. Restituisce (Path del CSV filtrato, set di nuove chiavi),
     oppure (None, set()) se non ci sono nuovi record.
     """
-    df = pd.read_csv(csv_path, dtype=str, encoding="utf-8")
+    try:
+        df = pd.read_csv(csv_path, dtype=str, encoding="utf-8")
+    except (pd.errors.EmptyDataError, FileNotFoundError):
+        df = pd.DataFrame()
+
+    if df.empty:
+        log.info("  Nessun record presente nel CSV grezzo.")
+        return None, set()
+
     df["_key"] = df.apply(_build_key, axis=1)
 
     df_nuovi = df[~df["_key"].isin(chiavi_processate)].copy()
@@ -218,10 +230,21 @@ Esempi:
     log.info("─" * 60)
     log.info("  Avvio Chrome headless – questa fase può richiedere diversi minuti.")
 
+    chiavi_processate: Set[str] = set()
+    if args.incremental:
+        chiavi_processate = _carica_stato()
+
     try:
         scraper = Fonte2Scraper(cfg)
+        if args.incremental:
+            scraper.keys_to_skip = chiavi_processate
         csv_grezzo = scraper.run()
         log.info(f"  CSV grezzo prodotto: {csv_grezzo}")
+    except ConnectionError as exc:
+        # Errore di rete: il server non risponde. Messaggio chiaro e uscita pulita.
+        print(f"\n[AVVISO RETE] {exc}")
+        log.warning("Estrazione Fonte 2 saltata per errore di rete. Il processo può proseguire con le altre fonti.")
+        sys.exit(0)   # exit(0) = nessun errore fatale, il master pipeline può continuare
     except Exception as exc:
         log.error(f"Errore durante l'estrazione: {exc}")
         sys.exit(1)
@@ -232,7 +255,6 @@ Esempi:
     # ------------------------------------------------------------------
     # 3. Filtro incrementale (se richiesto)
     # ------------------------------------------------------------------
-    chiavi_processate: Set[str] = set()
     nuove_chiavi: Set[str] = set()
     csv_da_normalizzare = csv_grezzo
 
@@ -241,14 +263,13 @@ Esempi:
         log.info("─" * 60)
         log.info("  FILTRO INCREMENTALE")
         log.info("─" * 60)
-        chiavi_processate = _carica_stato()
         csv_filtrato, nuove_chiavi = _filtra_incrementale(csv_grezzo, chiavi_processate)
 
         if csv_filtrato is None:
             t_elapsed = time.time() - t_start
             log.info("")
             log.info("=" * 60)
-            log.info("  Nessun nuovo record trovato. Pipeline terminata.")
+            log.info("  Nessun nuovo atto da processare. Database già aggiornato.")
             log.info(f"  Tempo totale: {t_elapsed:.1f}s")
             log.info("=" * 60)
             return

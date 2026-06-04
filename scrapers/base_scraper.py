@@ -5,13 +5,16 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# NON chiamare logging.basicConfig() qui: la configurazione del logging
+# è responsabilità degli script di alto livello (run_static.py, run_dynamic.py).
+# Una chiamata basicConfig() a livello di modulo configura il root logger su stderr
+# prima che gli orchestratori possano configurarlo su stdout.
 logger = logging.getLogger(__name__)
 
 class BaseScraper:
     def __init__(self, config):
         """
-        Initializes the scraper with configuration options and sets up a requests session.
+        Inizializza lo scraper con le opzioni di configurazione e crea una sessione requests.
         """
         self.config = config
         self.base_url = config.get('base_url', '')
@@ -22,26 +25,75 @@ class BaseScraper:
 
     def fetch_page(self, url, params=None, retries=3, backoff=2):
         """
-        Fetches a web page with retry capability and parses it into a BeautifulSoup object.
+        Scarica una pagina web con meccanismo di retry e la restituisce come oggetto BeautifulSoup.
+
+        In caso di Timeout o ConnectionError definitivo (dopo tutti i tentativi),
+        stampa un messaggio chiaro e restituisce None invece di sollevare un'eccezione,
+        così l'orchestratore può proseguire con la fonte successiva senza bloccarsi.
         """
         full_url = url if url.startswith('http') else urljoin(self.base_url, url)
+        last_exception = None
+
         for attempt in range(retries):
             try:
-                logger.info(f"Fetching: {full_url} with params {params} (Attempt {attempt+1}/{retries})")
-                # ⚠️ Unica modifica: timeout aumentato da 30 a 120 secondi per pagine molto grandi
+                if attempt == 0:
+                    logger.info(
+                        f"Connessione al server in corso: {full_url}\n"
+                        f"         [Attenzione: il server comunale puo' impiegare diversi minuti per rispondere. "
+                        f"Il processo NON e' bloccato – attesa risposta HTTP in corso...]"
+                    )
+                else:
+                    logger.info(
+                        f"Nuovo tentativo di connessione (retry {attempt} di {retries - 1}): {full_url}"
+                    )
+                # Timeout esplicito: 120 secondi per pagine molto grandi
                 response = self.session.get(full_url, params=params, timeout=120)
                 response.raise_for_status()
                 try:
                     return BeautifulSoup(response.content, 'lxml')
                 except Exception:
                     return BeautifulSoup(response.content, 'html.parser')
+
+            except requests.exceptions.Timeout as e:
+                last_exception = e
+                logger.warning(
+                    f"Timeout alla pagina {full_url} (Tentativo {attempt+1}/{retries}). "
+                    f"Il server non risponde entro 120 secondi."
+                )
+                if attempt < retries - 1:
+                    time.sleep(backoff * (attempt + 1))
+
+            except requests.exceptions.ConnectionError as e:
+                last_exception = e
+                logger.warning(
+                    f"Errore di connessione alla pagina {full_url} (Tentativo {attempt+1}/{retries}): {e}"
+                )
+                if attempt < retries - 1:
+                    time.sleep(backoff * (attempt + 1))
+
             except Exception as e:
-                logger.warning(f"Error fetching page {full_url}: {e}. Retrying in {backoff * (attempt + 1)}s...")
+                last_exception = e
+                logger.warning(
+                    f"Errore nel recupero della pagina {full_url}: {e}. "
+                    f"Nuovo tentativo tra {backoff * (attempt + 1)}s..."
+                )
                 if attempt < retries - 1:
                     time.sleep(backoff * (attempt + 1))
                 else:
-                    logger.error(f"Failed to fetch page {full_url} after {retries} attempts.")
+                    # Per errori non di rete (es. HTTP 4xx/5xx), rilancia l'eccezione
+                    logger.error(f"Impossibile recuperare la pagina {full_url} dopo {retries} tentativi.")
                     raise e
+
+        # Tutti i tentativi esauriti per Timeout o ConnectionError
+        print(
+            f"\n[AVVISO RETE] Il server del comune è temporaneamente lento o non risponde. "
+            f"Salto la fonte corrente. (URL: {full_url})\n"
+        )
+        logger.error(
+            f"Impossibile connettersi a {full_url} dopo {retries} tentativi. "
+            f"Ultima eccezione: {last_exception}"
+        )
+        return None
 
     def extract_table(self, soup, row_selector, field_map):
         """

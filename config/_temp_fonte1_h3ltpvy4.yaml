@@ -1,0 +1,22 @@
+annullato:
+  skip_next_row: true
+  style_contains: 'text-decoration: line-through'
+base_url: http://albosquillace.asmenet.it
+dettaglio_allegato_row: tbody tr
+dettaglio_link_download: td:nth-child(2) a
+dettaglio_nome_file: td:nth-child(1)
+dettaglio_table_selector: table.tablesorter:nth-of-type(2)
+fields:
+  data_pubblicazione: td:nth-child(5)
+  data_scadenza: td:nth-child(6)
+  ente: td:nth-child(3)
+  link_dettaglio: td:nth-child(7) a
+  numero_reg: td:nth-child(1)
+  oggetto: td:nth-child(4)
+  tipo: td:nth-child(2)
+list_url: /cercaArchivio.php?arch=ok&sez=
+name: ASMENET Squillace
+pagination: false
+row_selector: tbody tr
+table_selector: table.tablesorter
+tipo: static

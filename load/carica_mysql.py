@@ -42,15 +42,15 @@ FILE_CSV = BASE_DIR / "data" / "tracciato_mezzo.csv"
 
 # ---------------------------------------------------------------------------
 # Connessione DB di default
-# Il database e' stato importato con il nome "intermedimc.sql" (nome fisico).
-# MySQL su Windows e' case-insensitive, quindi "intermediMC.sql" funziona uguale.
+# Il database e' stato creato importando intermediMC.sql in HeidiSQL.
+# Il nome del database risultante e' "intermedimc" (MySQL case-insensitive).
 # ---------------------------------------------------------------------------
 DB_CONFIG = dict(
     host="localhost",
     port=3306,
     user="root",
-    password="",
-    database="intermedimc.sql",   # nome fisico del database intermediMC
+    password="admin",
+    database="intermedimc",        # nome del database in MySQL
     charset="latin1",
     collation="latin1_swedish_ci",
     use_unicode=False,             # invia byte latin1 nativi
@@ -158,7 +158,7 @@ def carica(
     host          : host MySQL (default: "localhost")
     user          : utente MySQL (default: "root")
     password      : password MySQL (default: "")
-    database      : nome database MySQL (default: "intermedimc.sql")
+    database      : nome database MySQL (default: "intermedimc")
 
     Restituisce
     -----------

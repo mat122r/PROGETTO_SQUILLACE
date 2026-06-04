@@ -138,6 +138,7 @@ class Fonte2Scraper(BaseScraper):
                 
                 valid_on_this_page = 0
                 older_than_limit_on_this_page = 0
+                early_exit = False
                 
                 for idx, row in enumerate(rows):
                     tds = row.find_all('td', recursive=False)
@@ -182,6 +183,15 @@ class Fonte2Scraper(BaseScraper):
                     if not numero_atto or not data_atto:
                         logger.warning(f"Missing Numero Atto ({numero_atto}) or Data Atto ({data_atto}) on page {page_num}, row {idx+1}. Skipping.")
                         continue
+
+                    # Check early exit for incremental mode
+                    if hasattr(self, 'keys_to_skip') and self.keys_to_skip:
+                        norm_data = self.normalize_date(data_atto).strip()
+                        current_key = f"{str(numero_atto).strip()}||{str(norm_data)}"
+                        if current_key in self.keys_to_skip:
+                            logger.info("Raggiunto record già processato. Interruzione incrementale.")
+                            early_exit = True
+                            break
                         
                     # Check Date filter >= 12/04/2024
                     try:
@@ -280,10 +290,12 @@ class Fonte2Scraper(BaseScraper):
                 
                 logger.info(f"Page {page_num} finished. Valid records: {valid_on_this_page}, Older than limit: {older_than_limit_on_this_page}")
                 
-                # If all records on this page were older than limit, we can terminate pagination safely
-                # (since acts are in descending order).
                 if len(rows) > 0 and older_than_limit_on_this_page == len(rows):
                     logger.info("All records on this page are older than 12/04/2024. Ending pagination loop.")
+                    break
+
+                if early_exit:
+                    logger.info("Interruzione incrementale del loop delle pagine.")
                     break
                     
                 # Increment page number

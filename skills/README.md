@@ -10,11 +10,12 @@ passando semplicemente un file di configurazione YAML.
 
 ```
 skills/   ← PUNTO DI INGRESSO UNICO (Agent-Ready)
-├── run_static.py          ← Orchestratore per portali statici (BeautifulSoup)
-├── run_dynamic.py         ← Orchestratore per portali dinamici (Selenium)
-├── template_static.yaml   ← Template YAML commentato per portali statici
-├── template_dynamic.yaml  ← Template YAML commentato per portali dinamici
-├── SKILL.md               ← Manuale nativo per agenti AI (Contratto Core)
+├── run_pipeline.py        ← MASTER ORCHESTRATOR (Lancia tutta la pipeline multifonte)
+├── run_static.py          ← Sotto-orchestratore per portali statici
+├── run_dynamic.py         ← Sotto-orchestratore per portali dinamici
+├── template_static.yaml
+├── template_dynamic.yaml
+├── SKILL.md               ← Manuale nativo per agenti AI
 └── README.md              ← Questo file
 ```
 
@@ -50,55 +51,61 @@ Il contratto stabilisce tre punti fermi:
 1. **L'agente legge `SKILL.md`** – Prima di qualsiasi operazione, l'agente
    carica le regole del Contratto Core, che definiscono workflow, strumenti
    disponibili e regole vincolanti.
-2. **L'agente compila il YAML, non scrive Python** – Il template YAML
-   (`template_static.yaml` o `template_dynamic.yaml`) è l'unica interfaccia
-   di configurazione. L'agente identifica i selettori CSS dal codice HTML
-   del portale e popola il file YAML in `config/`.
+2. **L'agente aggiunge una sezione in `config/sources.yaml`** – L'unica
+   interfaccia di configurazione è `config/sources.yaml`. L'agente identifica
+   i selettori CSS con F12 sul browser e aggiunge una nuova sezione `fonteN:`
+   con i valori del nuovo comune. Non crea mai file YAML separati.
 3. **Zero codice Python generato da zero** – La logica di esecuzione è
-   già blindata negli orchestratori `run_static.py` e `run_dynamic.py`.
-   Generare nuovi scraper Python è **esplicitamente vietato** dal contratto,
-   eliminando alla radice il rischio di allucinazioni, bug di sintassi e
-   regressioni.
+   già blindata nel Master Orchestrator `run_pipeline.py` e nei suoi
+   sotto-moduli. Generare nuovi scraper Python è **esplicitamente vietato**
+   dal contratto, eliminando alla radice il rischio di allucinazioni, bug
+   di sintassi e regressioni.
 
 ## Come aggiungere un nuovo portale
 
-### 1. Copia il template appropriato nella cartella `config/`
+### 1. Usa F12 per identificare il tipo di portale
 
-**Portale statico:**
-```bash
-cp skills/template_static.yaml config/nuovo_portale.yaml
+Apri il portale nel browser → disabilita JavaScript (DevTools → "Disable JavaScript") → ricarica.
+- Tabella **visibile** → portale **statico** → `tipo: "static"`
+- Tabella **scomparsa** → portale **dinamico** → `tipo: "dynamic"`
+
+> I template `template_static.yaml` e `template_dynamic.yaml` nella cartella `skills/`
+> sono disponibili come **riferimento commentato** per capire tutti i campi disponibili.
+
+### 2. Aggiungi una nuova sezione in `config/sources.yaml`
+
+Apri `config/sources.yaml` e aggiungi in fondo una nuova sezione `fonteN:`
+con i selettori CSS identificati con F12:
+
+```yaml
+fonte3:                                    # ← incrementa il numero
+  tipo: "static"                           # oppure "dynamic"
+  name: "Comune di Catanzaro – Albo"
+  base_url: "https://albo.comune.catanzaro.it"
+  list_url: "/archivio/cerca.php"
+  table_selector: "table.tablesorter"      # trovato con F12
+  row_selector: "tbody tr"
+  fields:
+    numero_reg:         "td:nth-child(1)"
+    tipo:               "td:nth-child(2)"
+    oggetto:            "td:nth-child(4)"
+    data_pubblicazione: "td:nth-child(5)"
+    data_scadenza:      "td:nth-child(6)"
+    link_dettaglio:     "td:nth-child(7) a"
 ```
 
-**Portale dinamico:**
+### 3. Lancia il Master Orchestrator
+
 ```bash
-cp skills/template_dynamic.yaml config/nuovo_portale_dinamico.yaml
+# Prima esecuzione completa (tutti i comuni incluso il nuovo)
+python skills/run_pipeline.py
+
+# Aggiornamenti periodici
+python skills/run_pipeline.py --incremental
 ```
 
-### 2. Modifica il file YAML con i valori del nuovo portale
-
-Apri il file copiato e compila i campi:
-
-- **`name`** – Nome descrittivo del portale (es. `"Comune di Catanzaro – Albo"`).
-- **`base_url`** – URL base del sito (es. `"https://albo.comune.catanzaro.it"`).
-- **`list_url`** – URL relativo della pagina con la lista degli atti.
-- **`table_selector`** / **`row_selector`** – Selettori CSS per la tabella e le righe.
-- **`fields`** – Mappa nome campo → selettore CSS della cella.
-
-> **Suggerimento:** Usa gli strumenti di sviluppo del browser (tasto F12) per
-> identificare i selettori CSS corretti. Fai clic destro su un elemento della
-> tabella e scegli "Ispeziona" per vedere la struttura HTML.
-
-### 3. Lancia l'orchestratore
-
-**Portale statico:**
-```bash
-python skills/run_static.py --config config/nuovo_portale.yaml
-```
-
-**Portale dinamico:**
-```bash
-python skills/run_dynamic.py --config config/nuovo_portale_dinamico.yaml
-```
+Il sistema rileva automaticamente `fonte3` e la include nella progressione `[3/3]`.
+**Non serve toccare nessun file Python.**
 
 ---
 
@@ -117,31 +124,40 @@ Entrambi gli orchestratori accettano le stesse opzioni:
 | `--db-host HOST` | Host MySQL | `localhost` |
 | `--db-user UTENTE` | Utente MySQL | `root` |
 | `--db-password PASSWORD` | Password MySQL | *(vuota)* |
-| `--db-name DATABASE` | Nome del database MySQL | `intermedimc.sql` |
+| `--db-name DATABASE` | Nome del database MySQL | `intermediMC` |
 
 ### Esempi
 
 ```bash
-# Pipeline completa con portale statico
-python skills/run_static.py --config config/nuovo_portale.yaml
+# =======================================================================
+# USO NORMALE — Master Orchestrator (tutte le fonti in un colpo solo)
+# =======================================================================
 
-# Solo estrazione e normalizzazione (senza caricare su MySQL)
-python skills/run_static.py --config config/nuovo_portale.yaml --no-load
+# Pipeline completa: E → T → L per tutti i comuni in sources.yaml
+python skills/run_pipeline.py
 
-# Pipeline dinamica con credenziali MySQL personalizzate
-python skills/run_dynamic.py --config config/portale_dinamico.yaml \
+# Solo nuovi atti (incrementale) per tutti i comuni
+python skills/run_pipeline.py --incremental
+
+# Verifica ambiente senza eseguire la pipeline
+python skills/run_pipeline.py --check
+
+# Estrazione + normalizzazione senza caricare su MySQL
+python skills/run_pipeline.py --no-load
+
+# =======================================================================
+# USO AVANZATO — Sotto-orchestratori singoli (per debug o test isolati)
+# =======================================================================
+
+# Testa un singolo portale statico senza toccare sources.yaml
+python skills/run_static.py --config config/sources.yaml --no-load
+
+# Testa un singolo portale dinamico con credenziali MySQL personalizzate
+python skills/run_dynamic.py --config config/sources.yaml \
     --db-host 192.168.1.10 --db-user etl_user --db-password secret
 
-# Pipeline statica con percorsi di output personalizzati
-python skills/run_static.py --config config/nuovo_portale.yaml \
-    --output-csv data/nuovo_portale_raw.csv \
-    --tracciato data/nuovo_portale_tracciato.csv
-
-# Pipeline in modalità INCREMENTALE (Isolamento dei soli nuovi atti)
-python skills/run_static.py --config config/nuovo_portale.yaml --incremental
-
-# Solo estrazione dinamica incrementale senza caricamento DB
-python skills/run_dynamic.py --config config/portale_dinamico.yaml --incremental --no-load
+# Modalità incrementale su singola fonte
+python skills/run_static.py --config config/sources.yaml --incremental --no-load
 ```
 
 ---
@@ -196,7 +212,7 @@ Le dipendenze principali sono:
 ### Database MySQL
 - MySQL in esecuzione su `localhost:3306`
 - Schema importato da `intermediMC.sql`
-- Credenziali di default: utente `root`, nessuna password
+- Credenziali di default: utente `root`,  password: `admin`
 
 ### Per portali dinamici
 - **Google Chrome** installato (qualsiasi versione recente)
@@ -217,4 +233,4 @@ Le dipendenze principali sono:
 
 ---
 
-*Skills create il 3 giugno 2026 nell'ambito del Progetto Squillace – Pipeline ETL. Ultima revisione: 3 giugno 2026.*
+*Progetto Squillace – Pipeline ETL | Mattia Cannavò | Progetto terminato il 29 maggio 2026, revisionato per l'ultima volta il 3 giugno 2026.*

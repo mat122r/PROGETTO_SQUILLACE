@@ -20,36 +20,20 @@ Frasi che attivano questa skill:
 
 ---
 
-## Strumenti disponibili
+##  Strumenti disponibili
 
-| Strumento       | Quando usarlo                        | Comando                                                        |
-|-----------------|--------------------------------------|----------------------------------------------------------------|
-| `run_static.py`  | Portale HTML statico (BeautifulSoup) | `python skills/run_static.py --config config/portale.yaml`    |
-| `run_dynamic.py` | Portale JS dinamico (Selenium)       | `python skills/run_dynamic.py --config config/portale.yaml`   |
 
-Entrambi supportano i flag:
+| Strumento         | Quando usarlo                          | Comando                                      |
+|-------------------|----------------------------------------|----------------------------------------------|
+| run_pipeline.py   | MASTER: Esegue tutta la pipeline ETL   | python skills/run_pipeline.py                |
+| run_static.py     | Sotto-modulo per un solo portale HTML  | python skills/run_static.py --config ...     |
+| run_dynamic.py    | Sotto-modulo per un solo portale JS    | python skills/run_dynamic.py --config ...    |
 
-| Flag              | Effetto                                                          |
-|-------------------|------------------------------------------------------------------|
-| `--config`        | **(obbligatorio)** Percorso del file YAML di configurazione      |
-| `--incremental`   | Elabora solo i nuovi atti non ancora processati                  |
-| `--no-normalize`  | Salta la fase di normalizzazione                                 |
-| `--no-load`       | Salta il caricamento su MySQL                                    |
-| `--db-host`       | Sovrascrive l'host MySQL                                         |
-| `--db-user`       | Sovrascrive l'utente MySQL                                       |
-| `--db-password`   | Sovrascrive la password MySQL                                    |
-| `--db-name`       | Sovrascrive il nome del database MySQL                           |
-
----
-
-## Workflow obbligatorio (step-by-step)
-
-1. **Determina il tipo di portale**: statico o dinamico (vedi guida sotto).
-2. **Copia il template YAML** appropriato da `skills/` a `config/`.
-3. **Compila il file YAML** con i selettori CSS del nuovo portale.
-4. **Esegui l'orchestratore** con il flag `--config`.
-5. **Verifica il riepilogo finale** nei log.
-6. Per esecuzioni successive, usa `--incremental` per estrarre solo nuovi atti.
+##  Workflow obbligatorio per l'Agente (Step-by-Step)
+1. **Identifica la fonte**: Determina se il nuovo comune è statico o dinamico.
+2. **Aggiorna la configurazione**: Inserisci i selettori CSS del nuovo comune direttamente dentro `config/sources.yaml`.
+3. **Esegui in un colpo solo**: Lancia the Master Orchestrator `python skills/run_pipeline.py`.
+4. **Mantenimento**: Usa `python skills/run_pipeline.py --incremental` per aggiornamenti periodici.
 
 ---
 
@@ -68,8 +52,8 @@ Entrambi supportano i flag:
 1. Apri il portale nel browser.
 2. Disabilita JavaScript (DevTools → Settings → Debugger → "Disable JavaScript").
 3. Ricarica la pagina.
-4. Se la tabella degli atti **scompare o è vuota** → **portale dinamico** → usa `run_dynamic.py`.
-5. Se la tabella è **ancora visibile e popolata** → **portale statico** → usa `run_static.py`.
+4. Se la tabella degli atti **scompare o è vuota** → **portale dinamico** → imposta `tipo: "dynamic"` nel YAML.
+5. Se la tabella è **ancora visibile e popolata** → **portale statico** → imposta `tipo: "static"` nel YAML.
 
 ---
 
@@ -83,7 +67,7 @@ Gli orchestratori supportano il flag `--incremental`. Quando attivo:
 - Aggiorna automaticamente il file di stato al termine dell'esecuzione.
 
 **Chiavi univoche utilizzate:**
-- Portali statici: `numero_reg||data_atto`
+- Portali statici: `numero_reg`
 - Portali dinamici: `numero_atto||data_atto`
 
 ---
@@ -92,29 +76,46 @@ Gli orchestratori supportano il flag `--incremental`. Quando attivo:
 
 **Scenario:** L'utente chiede "aggiungi il comune di Borgia".
 
+```yaml
+# 1. Apro config/sources.yaml e aggiungo la nuova sezione in fondo
+
+fonte3:
+  tipo: "static"                        # statico: tabella visibile senza JavaScript
+  name: "Comune di Borgia – Albo Pretorio"
+  base_url: "https://albo.comune.borgia.cz.it"
+  list_url: "/archivio/cerca.php"
+  table_selector: "table.tablesorter"   # trovato con F12 sul browser
+  row_selector: "tbody tr"
+  fields:
+    numero_reg:         "td:nth-child(1)"
+    tipo:               "td:nth-child(2)"
+    oggetto:            "td:nth-child(4)"
+    data_pubblicazione: "td:nth-child(5)"
+    data_scadenza:      "td:nth-child(6)"
+    link_dettaglio:     "td:nth-child(7) a"
+```
+
 ```bash
-# 1. Analizzo il portale e determino che è statico
-
-# 2. Copio il template nella cartella config/
-copy skills\template_static.yaml config\borgia.yaml
-
-# 3. Compilo i selettori CSS nel file YAML (con F12 sul browser)
-#    → name, base_url, list_url, table_selector, row_selector, fields, ...
-
-# 4. Prima esecuzione completa
-python skills/run_static.py --config config/borgia.yaml
+# 2. Lancio il Master Orchestrator — gestisce tutto in automatico
+python skills/run_pipeline.py
 
 # Output atteso:
-# Atti inseriti:       150
-# Documenti inseriti:  320
-# Pipeline completata con successo. ✓
+#   Fonti configurate: 3
+#     - fonte1: ASMENET Squillace [static]
+#     - fonte2: Halley Squillace [dynamic]
+#     - fonte3: Comune di Borgia [static]      ← rilevato automaticamente
+#
+# [1/3] Avvio pipeline ASMENET Squillace...
+#   [OK] ASMENET Squillace completata.
+# [2/3] Avvio pipeline Halley Squillace...
+#   [OK] Halley Squillace completata.
+# [3/3] Avvio pipeline Comune di Borgia...
+#   [OK] Comune di Borgia completata.
+#
+# PIPELINE ETL GLOBALE TERMINATA – 3/3 fonti elaborate. [OK]
 
-# 5. Aggiornamenti periodici (solo nuovi atti)
-python skills/run_static.py --config config/borgia.yaml --incremental
-# Output atteso (se ci sono 3 nuovi atti):
-# Nuovi record da processare: 3
-# Atti inseriti:       3
-# Pipeline completata con successo. ✓
+# 3. Aggiornamenti periodici (solo nuovi atti per tutti i comuni)
+python skills/run_pipeline.py --incremental
 ```
 
 ---
@@ -133,4 +134,4 @@ python skills/run_static.py --config config/borgia.yaml --incremental
 
 ---
 
-*Skill creata il 3 giugno 2026 – Progetto Squillace ETL.*
+*Progetto Squillace – Pipeline ETL | Mattia Cannavò | Ultima revisione: 3 giugno 2026*
