@@ -1,0 +1,17 @@
+# Ignora la cartella degli allegati pesanti
+allegati/
+
+# Cache di Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE e ambienti virtuali
+.vscode/
+.idea/
+venv/
+env/
+.env
+
+# Ignora opzionalmente i raw data troppo pesanti
+# data/*.csv

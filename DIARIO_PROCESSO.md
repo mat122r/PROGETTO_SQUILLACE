@@ -1,6 +1,6 @@
 # DIARIO DI PROCESSO – Pipeline ETL Portali Comunali
 ### Progetto Squillace – Pipeline ETL per Portali Comunali
-*Realizzato da Mattia Cannavò | 29 maggio – 4 giugno 2026*
+*Progetto personale realizzato da Mattia Cannavò | Terminato il 29 maggio 2026, revisionato il 5 giugno 2026*
 
 > **A cosa serve questo documento**
 > Questo diario risponde alla domanda *"come hai lavorato con l'agente AI?"*
@@ -233,5 +233,31 @@ Campione di 20 record verificati manualmente. Tutti i percorsi risolti correttam
 
 ---
 
-*Fine diario di processo. Ultima revisione: 4 giugno 2026.*
+## 4. REVISIONE FINALE – 5 Giugno 2026
+
+In fase di collaudo su un'installazione pulita, sono emersi quattro comportamenti anomali, definitivamente risolti:
+
+**BUG 5 – Fallimento pipeline su installazione pulita (Dipendenza file)**
+*Sintomo:* Lanciando la pipeline in un ambiente completamente nuovo, l'esecuzione falliva prima ancora di processare la seconda fonte.
+*Causa radice:* La funzione `normalizza()` era agganciata ai singoli sotto-orchestratori, pretendendo l'esistenza di entrambi i CSV grezzi ancor prima che l'estrazione fosse terminata.
+*Fix:* Orchestrazione centralizzata. I sotto-orchestratori ora fungono da puri estrattori (`--no-normalize`, `--no-load`). Il master orchestrator attende la fine di tutte le estrazioni per avviare un'unica fase di normalizzazione globale.
+
+**BUG 6 – Sovrascrittura e crash del Database MySQL**
+*Sintomo:* Rieseguendo la pipeline, l'inserimento andava in crash per violazione di chiavi.
+*Causa radice:* Lo script `carica_mysql.py` provava a fare `INSERT` ciechi senza controllare lo stato delle tabelle.
+*Fix:* Implementati i flag CLI `--truncate` (per svuotare le tabelle e ricaricare da zero in sicurezza) e `--append` (per accodare ai dati esistenti ricalcolando in modo incrementale il progressivo dell'anno).
+
+**BUG 7 – Hardcoding delle credenziali MySQL**
+*Sintomo:* Accesso negato se il database locale richiedeva una password.
+*Causa radice:* Host, utente e password erano fissati direttamente dentro `carica_mysql.py`.
+*Fix:* Credenziali esternalizzate. Il master orchestrator ora legge il blocco `database` direttamente dal file centrale `config/sources.yaml` e lo inietta dinamicamente.
+
+**BUG 8 – Mojibake ed eccezioni sui nomi dei file PDF**
+*Sintomo:* Durante lo scraping di ASMENET, PDF con caratteri accentati venivano salvati con nomi illeggibili o facevano crashare il modulo OS.
+*Causa radice:* `BeautifulSoup` non interpretava correttamente l'encoding della pagina HTML sorgente.
+*Fix:* Forzata la codifica UTF-8 durante il fetching in `base_scraper.py` e inserito un blocco di regex restrittive per sanificare i filename prima del salvataggio su disco.
+
+---
+
+*Fine diario di processo. Progetto terminato il 29 maggio 2026, revisionato il 5 giugno 2026.*
 

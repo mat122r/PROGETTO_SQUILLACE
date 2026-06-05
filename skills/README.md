@@ -117,6 +117,8 @@ Entrambi gli orchestratori accettano le stesse opzioni:
 |---------|-------------|---------|
 | `--config PERCORSO` | **(obbligatorio)** Percorso del file YAML | – |
 | `--incremental` | Esecuzione incrementale: processa solo i nuovi atti (delta) | off |
+| `--truncate` | Svuota le tabelle MySQL prima del caricamento | off |
+| `--append` | Accoda ai dati esistenti in MySQL ricalcolando il progressivo per anno | off |
 | `--output-csv PERCORSO` | Percorso del CSV grezzo di output | `data/fonte1_raw.csv` (static) / `data/fonte2_raw.csv` (dynamic) |
 | `--tracciato PERCORSO` | Percorso del tracciato di mezzo | `data/tracciato_mezzo.csv` |
 | `--no-normalize` | Salta la fase di normalizzazione | off |
@@ -233,4 +235,4 @@ Le dipendenze principali sono:
 
 ---
 
-*Progetto Squillace – Pipeline ETL | Mattia Cannavò | Progetto terminato il 29 maggio 2026, revisionato per l'ultima volta il 3 giugno 2026.*
+*Progetto Squillace – Pipeline ETL | Mattia Cannavò | Progetto terminato il 29 maggio 2026, revisionato il 5 giugno 2026.*

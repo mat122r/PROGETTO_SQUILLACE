@@ -26,8 +26,12 @@ python skills/run_pipeline.py --check
 # 3. Prima estrazione completa (E → T → L per tutti i comuni)
 python skills/run_pipeline.py
 
-# 4. Aggiornamenti successivi (solo nuovi atti, nessun duplicato)
-python skills/run_pipeline.py --incremental
+# 4. Aggiornamenti successivi
+# Accoda i nuovi atti al DB senza svuotarlo:
+python skills/run_pipeline.py --incremental --append
+
+# Oppure, per forzare lo svuotamento totale delle tabelle MySQL:
+python skills/run_pipeline.py --truncate
 ```
 
 > ⚠️ Il server ASMENET impiega 4-5 minuti per rispondere. Il processo non è bloccato: attendi senza interrompere.
@@ -61,7 +65,30 @@ Il progetto adotta una documentazione multi-file: ogni documento ha un'audience 
 
 ---
 
+## 🤖 Agenti AI utilizzati
 
+| Agente / Modello | Ruolo nel progetto |
+|------------------|-------------------|
+| **Antigravity** (Claude Sonnet 4.6, Gemini 3.1 Pro High, Gemini 3.5 Flash High) | Sviluppatore e orchestratore principale. Ha generato la struttura iniziale E/T/L, scritto gli scraper, progettato il tracciato di mezzo e costruito l'ecosistema Agent-Ready. |
+| **DeepSeek** | Revisore critico. Ha verificato il codice prodotto da Antigravity, analizzato i log di esecuzione, suggerito correzioni e monitorato la coerenza tra tracciato di mezzo e tabelle MySQL. |
+
+### Errori e correzioni (sintesi)
+
+Durante lo sviluppo sono stati identificati e corretti diversi bug critici:
+- **Crash su installazione pulita**: la normalizzazione dipendeva dai singoli
+  sotto-orchestratori. Risolto centralizzando le fasi T e L nel Master Orchestrator.
+- **Nomi file PDF corrotti (mojibake)**: l'encoding delle pagine non veniva forzato,
+  producendo caratteri illeggibili nei nomi dei file. Risolto con `response.encoding = 'utf-8'`
+  e sanitizzazione avanzata dei filename.
+- **Sovrascrittura e crash MySQL**: le tabelle venivano popolate senza controllare
+  lo stato esistente. Risolto aggiungendo i flag `--truncate` e `--append`.
+- **Credenziali hardcoded**: host, utente e password erano fissi nel codice.
+  Risolto centralizzando la configurazione in `config/sources.yaml`.
+
+> Per il dettaglio tecnico completo di tutti i bug e delle risoluzioni, si veda il
+> **[DIARIO_PROCESSO.md](DIARIO_PROCESSO.md)**.
+
+---
 
 ## Struttura del progetto
 
@@ -224,22 +251,20 @@ Tramite **HeidiSQL** ci siamo connessi al server (`localhost:3306`, utente
 creare il database e le tabelle necessarie. Le tabelle sono state create
 vuote e pronte per essere popolate.
 
-### Nota sulle credenziali
-Le credenziali utilizzate sono `root` / `admin`, adatte all'ambiente di
-sviluppo locale. In un ambiente di produzione, le credenziali andrebbero
-inserite in un file `.env` separato ed escluso dal versionamento tramite
-`.gitignore`.
+### Credenziali DB centralizzate
+Le credenziali del database non sono più hardcoded nel codice. Possono essere
+modificate all'interno del file `config/sources.yaml` nel blocco `database:`.
+In un ambiente di produzione, si raccomanda di non versionare credenziali reali.
 
 ### Script di caricamento
 Lo script `load/carica_mysql.py`:
-1. Si connette a MySQL su `localhost:3306` (utente `root`, password `admin`).
-2. Legge il tracciato di mezzo con pandas.
-3. Per ogni riga, genera un numero progressivo di pubblicazione e calcola
-   l'anno di riferimento.
-4. Inserisce un record nella tabella `mcputerecupubbinte` (atti).
-5. Per ogni atto, inserisce il documento principale e gli allegati nella
-   tabella `mcrecorecuallepubb`, collegandoli tramite la coppia
-   `(PBU_NUM, PBU_ANN)`.
+1. Viene chiamato dal Master Orchestrator una sola volta al termine di tutte le estrazioni.
+2. Si connette a MySQL utilizzando le credenziali definite in `config/sources.yaml`.
+3. Legge il tracciato di mezzo con pandas.
+4. Se le tabelle non sono vuote, blocca il processo a meno che non si usino i flag:
+   - `--truncate`: svuota le tabelle e riparte col progressivo 1.
+   - `--append`: calcola il `MAX(MCRECU_PBU_NUM)` dell'anno e accoda i nuovi record.
+5. Inserisce i record nelle tabelle collegate `mcputerecupubbinte` (atti) e `mcrecorecuallepubb` (allegati).
 
 ### Risultato finale
 - **4.055 atti** inseriti in `mcputerecupubbinte`
@@ -252,6 +277,6 @@ Lo script `load/carica_mysql.py`:
 
 
 ---
-*Progetto realizzato da Mattia Cannavò | 29 maggio 2026. Ultima revisione: 4 giugno 2026*
+*Progetto personale realizzato da Mattia Cannavò | Terminato il 29 maggio 2026, revisionato il 5 giugno 2026*
 
 > Per il racconto dettagliato del processo di sviluppo, degli errori corretti e della strategia di verifica, leggi [`DIARIO_PROCESSO.md`](DIARIO_PROCESSO.md).

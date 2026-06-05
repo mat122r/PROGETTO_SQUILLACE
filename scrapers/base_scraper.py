@@ -49,10 +49,11 @@ class BaseScraper:
                 # Timeout esplicito: 120 secondi per pagine molto grandi
                 response = self.session.get(full_url, params=params, timeout=120)
                 response.raise_for_status()
+                response.encoding = 'utf-8' # Forza decodifica corretta
                 try:
-                    return BeautifulSoup(response.content, 'lxml')
+                    return BeautifulSoup(response.text, 'lxml')
                 except Exception:
-                    return BeautifulSoup(response.content, 'html.parser')
+                    return BeautifulSoup(response.text, 'html.parser')
 
             except requests.exceptions.Timeout as e:
                 last_exception = e

@@ -180,17 +180,25 @@ def normalizza(
     log.info(f"  Output:   {out}")
 
     # Verifica esistenza file
-    for f in (f1, f2):
-        if not f.exists():
-            log.error(f"File non trovato: {f}")
-            raise FileNotFoundError(f"File non trovato: {f}")
+    df_list = []
+    
+    if f1.exists():
+        df_list.append(elabora_fonte1(f1))
+    else:
+        log.warning(f"File non trovato, salto Fonte 1: {f1}")
 
-    df1 = elabora_fonte1(f1)
-    df2 = elabora_fonte2(f2)
+    if f2.exists():
+        df_list.append(elabora_fonte2(f2))
+    else:
+        log.warning(f"File non trovato, salto Fonte 2: {f2}")
+        
+    if not df_list:
+        log.error("Nessun file sorgente trovato per la normalizzazione.")
+        raise FileNotFoundError("Nessun file sorgente trovato per la normalizzazione.")
 
     # --- Unione ---
     log.info("=== UNIONE ===")
-    tracciato = pd.concat([df1, df2], ignore_index=True)
+    tracciato = pd.concat(df_list, ignore_index=True)
 
     # Assicura ordine colonne
     tracciato = tracciato[COLONNE_FINALI]

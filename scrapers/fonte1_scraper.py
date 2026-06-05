@@ -33,9 +33,24 @@ class Fonte1Scraper(BaseScraper):
         """
         if not filename:
             return "unnamed_file"
-        filename = filename.strip()
-        # Remove any characters not allowed in file names
+        
+        # Decodifica esplicita mojibake se presente 
+        # (se era codificato male come Â, es. \xc2\xa0 letto come latin1)
+        try:
+            filename = filename.encode('latin1').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+            
+        # Sostituisci NBSP con spazio normale
+        filename = filename.replace('\xa0', ' ').replace('\u00A0', ' ')
+        
+        # Rimuovi spazi anomali o caratteri di controllo
+        filename = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', filename)
+        filename = re.sub(r'\s+', ' ', filename).strip()
+        
+        # Remove any characters not allowed in Windows file names
         filename = re.sub(r'[\\/*?:"<>|]', '_', filename)
+        
         return filename
 
     def run(self):

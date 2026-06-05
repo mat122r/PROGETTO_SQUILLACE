@@ -49,7 +49,7 @@ DB_CONFIG = dict(
     host="localhost",
     port=3306,
     user="root",
-    password="admin",
+    password="",
     database="intermedimc",        # nome del database in MySQL
     charset="latin1",
     collation="latin1_swedish_ci",
@@ -147,6 +147,8 @@ def carica(
     user: Optional[str] = None,
     password: Optional[str] = None,
     database: Optional[str] = None,
+    truncate: bool = False,
+    append: bool = False,
 ) -> dict:
     """
     Carica il tracciato di mezzo su MySQL.
@@ -200,18 +202,38 @@ def carica(
         raise
 
     # Verifica tabelle vuote
+    n_atti = 0
     for t in ("mcputerecupubbinte", "mcrecorecuallepubb"):
         cur.execute(f"SELECT COUNT(*) FROM `{t}`")
         n = cur.fetchone()[0]
-        if n > 0:
-            log.warning(f"Tabella {t} contiene gia' {n} righe - procedo comunque.")
+        if t == "mcputerecupubbinte":
+            n_atti = n
+
+    if n_atti > 0:
+        if truncate:
+            cur.execute("TRUNCATE TABLE mcrecorecuallepubb")
+            cur.execute("TRUNCATE TABLE mcputerecupubbinte")
+            log.info("Le tabelle sono state svuotate (--truncate).")
+            conn.commit()
+            n_atti = 0
+        elif append:
+            log.info(f"Le tabelle contengono gia' {n_atti} atti. Procedo in accodamento (--append).")
+        else:
+            log.error("Le tabelle non sono vuote e non e' specificato --truncate o --append. Operazione annullata.")
+            raise ValueError("Tabelle MySQL non vuote (usare --truncate per sovrascrivere o --append per accodare).")
 
     # Lettura CSV
     df = pd.read_csv(file_csv, dtype=str, encoding="utf-8")
     totale = len(df)
     log.info(f"Righe nel tracciato di mezzo: {totale}")
 
-    pbu_num = 1
+    # Recupera i massimi pbu_num per anno (se in append)
+    max_pbu_per_anno = {}
+    if append and n_atti > 0:
+        cur.execute("SELECT MCRECU_PBU_ANN, MAX(MCRECU_PBU_NUM) FROM mcputerecupubbinte GROUP BY MCRECU_PBU_ANN")
+        for r in cur.fetchall():
+            max_pbu_per_anno[r[0]] = r[1]
+
     tot_atti = 0
     tot_docs = 0
 
@@ -229,6 +251,10 @@ def carica(
 
         # Anno pubblicazione
         pbu_ann = _anno(data_pub_s, data_atto_s)
+        
+        # Calcola pbu_num per l'anno corrente
+        pbu_num = max_pbu_per_anno.get(pbu_ann, 0) + 1
+        max_pbu_per_anno[pbu_ann] = pbu_num
 
         # a. INSERT atto
         cur.execute(SQL_ATTO, (
@@ -270,9 +296,6 @@ def carica(
                     _enc(perc[:200]),
                 ))
                 tot_docs += 1
-
-        # d. Incrementa progressivo
-        pbu_num += 1
 
         # e. Commit periodico e log
         if tot_atti % COMMIT_OGNI == 0:

@@ -25,7 +25,7 @@ Frasi che attivano questa skill:
 
 | Strumento         | Quando usarlo                          | Comando                                      |
 |-------------------|----------------------------------------|----------------------------------------------|
-| run_pipeline.py   | MASTER: Esegue tutta la pipeline ETL   | python skills/run_pipeline.py                |
+| run_pipeline.py   | MASTER: Esegue tutta la pipeline ETL   | python skills/run_pipeline.py [--truncate \| --append] |
 | run_static.py     | Sotto-modulo per un solo portale HTML  | python skills/run_static.py --config ...     |
 | run_dynamic.py    | Sotto-modulo per un solo portale JS    | python skills/run_dynamic.py --config ...    |
 
@@ -134,4 +134,4 @@ python skills/run_pipeline.py --incremental
 
 ---
 
-*Progetto Squillace – Pipeline ETL | Mattia Cannavò | Ultima revisione: 3 giugno 2026*
+*Progetto personale – Pipeline ETL | Mattia Cannavò | Terminato il 29 maggio 2026, revisionato il 5 giugno 2026*
